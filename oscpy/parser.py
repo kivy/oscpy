@@ -6,7 +6,7 @@ def parse_int(value):
 
 
 def parse_float(value):
-    pass
+    return struct.unpack('>f', value)[0]
 
 
 def parse_string(value):
