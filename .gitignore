@@ -1,0 +1,6 @@
+*.pyc
+*.pyo
+*.c
+*.pyd
+*.egg-info
+.pytest_cache
