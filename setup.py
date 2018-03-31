@@ -36,7 +36,9 @@ setup(
 
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
     install_requires=[],
-    extras_require={},
+    extras_require={
+        'dev': ['pytest', 'wheel']
+    },
     package_data={},
     data_files=[],
     entry_points={},
