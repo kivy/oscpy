@@ -1,17 +1,20 @@
 import struct
 
+Int = struct.Struct('>i')
+Float = struct.Struct('>f')
 
-def padded(l):
-    m, r = divmod(l, 4)
-    return 4 * (min(1, r) + l // 4)
+
+def padded(l, n=4):
+    m, r = divmod(l, n)
+    return n * (min(1, r) + l // n)
 
 
 def parse_int(value):
-    return struct.unpack('>i', value)[0]
+    return Int.unpack(value)[0]
 
 
 def parse_float(value):
-    return struct.unpack('>f', value)[0]
+    return Float.unpack(value)[0]
 
 
 def parse_string(value):
