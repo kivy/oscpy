@@ -8,3 +8,9 @@ def test_parse_int():
 
 def test_parse_float():
     assert parse(b'f', struct.pack('>f', 1.5)) == 1.5
+
+
+def test_parse_string():
+    assert parse(b's', struct.pack('>s', b't')) == b't'
+    s = b'test'
+    assert parse(b's', struct.pack('%ss' % len(s), s)) == s

@@ -10,7 +10,7 @@ def parse_float(value):
 
 
 def parse_string(value):
-    pass
+    return struct.unpack('%ss' % len(value), value)[0]
 
 
 def parse_blob(value):
