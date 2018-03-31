@@ -26,11 +26,11 @@ def test_parse_string():
 
 
 def test_parse_blob():
-    l = 10
-    data = tuple(range(l))
-    pad = padded(l, 8)
+    length = 10
+    data = tuple(range(length))
+    pad = padded(length, 8)
     fmt = '>i%iQ' % pad
-    s = struct.pack(fmt, l, *(data + (pad - l) * (0, )))
+    s = struct.pack(fmt, length, *(data + (pad - length) * (0, )))
     result = parse(b'b', s)[0]
     assert result == data
 
