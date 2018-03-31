@@ -1,6 +1,11 @@
 import struct
 
 
+def padded(l):
+    m, r = divmod(l, 4)
+    return 4 * (min(1, r) + l // 4)
+
+
 def parse_int(value):
     return struct.unpack('>i', value)[0]
 
@@ -10,7 +15,7 @@ def parse_float(value):
 
 
 def parse_string(value):
-    return struct.unpack('%ss' % len(value), value)[0]
+    return struct.unpack('%ss' % len(value), value)[0].strip(b'\0')
 
 
 def parse_blob(value):
