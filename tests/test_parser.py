@@ -18,11 +18,11 @@ def test_padd_string():
 
 
 def test_parse_string():
-    assert parse(b's', struct.pack('%ss' % padded(len('t')), b't')) == b't'
+    assert parse(b's', struct.pack('%is' % padded(len('t')), b't')) == b't'
     s = b'test'
-    assert parse(b's', struct.pack('%ss' % len(s), s)) == s
+    assert parse(b's', struct.pack('%is' % len(s), s)) == s
     s = b'test padding'
-    assert parse(b's', struct.pack('%ss' % padded(len(s)), s)) == s
+    assert parse(b's', struct.pack('%is' % padded(len(s)), s)) == s
 
 
 def test_parse_blob():
