@@ -23,3 +23,13 @@ def test_parse_string():
     assert parse(b's', struct.pack('%ss' % len(s), s)) == s
     s = b'test padding'
     assert parse(b's', struct.pack('%ss' % padded(len(s)), s)) == s
+
+
+def test_parse_blob():
+    l = 10
+    data = tuple(range(l))
+    pad = padded(l, 8)
+    fmt = '>i%iQ' % pad
+    s = struct.pack(fmt, l, *(data + (pad - l) * (0, )))
+    result = parse(b'b', s)
+    assert result == data

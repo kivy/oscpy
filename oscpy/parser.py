@@ -19,7 +19,13 @@ def parse_string(value):
 
 
 def parse_blob(value):
-    pass
+    size = struct.calcsize('>i')
+    length = struct.unpack('>i', value[:size])[0]
+    data = struct.unpack(
+        '>%iQ' % length,
+        value[size:size + struct.calcsize('%iQ' % length)]
+    )
+    return data
 
 
 parsers = {
