@@ -1,5 +1,4 @@
 import socket
-from random import randint
 from time import time
 
 from oscpy.server import OSCThreadServer
@@ -12,18 +11,17 @@ def test_instance():
 
 def test_listen():
     osc = OSCThreadServer()
-    sock = osc.listen(port=9000)
+    sock = osc.listen()
     osc.stop(sock)
 
 
 def test_bind():
     osc = OSCThreadServer()
-    port = randint(9000, 9100)
-    sock = osc.listen(port=port)
+    sock = osc.listen()
+    port = sock.getsockname()[1]
     cont = []
 
     def success(*values):
-        print("success called")
         cont.append(True)
 
     osc.bind(sock, b'/success', success)

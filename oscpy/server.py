@@ -21,7 +21,7 @@ class OSCThreadServer(object):
             callbacks.append(callback)
         self.addresses[(socket, address)] = callbacks
 
-    def listen(self, address='localhost', port=9000):
+    def listen(self, address='localhost', port=0):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((address, port))
         sock.setblocking(0)
