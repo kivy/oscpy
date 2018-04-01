@@ -58,6 +58,10 @@ writters = (
     (object, (b'b', b'%ib')),
 )
 
+padsizes = {
+    bytes: 4,
+    object: 8
+}
 
 def parse(hint, value, offset=0):
     parser = parsers.get(hint)
@@ -78,15 +82,21 @@ def format_message(address, values):
             if isinstance(v, cls):
                 tag, f = writter
                 if b'%i' in f:
-                    f = f % len(v)
+                    v += b'\0'
+                    f = f % padded(len(v), padsizes[cls])
+
                 tags.append(tag)
                 fmt.append(f)
                 break
 
     fmt = b''.join(fmt)
-    tags = b''.join(tags)
+    tags = b''.join(tags + [b'\0'])
+
+    if not address.endswith(b'\0'):
+        address += b'\0'
 
     fmt = b'>%is%is%s' % (padded(len(address)), padded(len(tags)), fmt)
+    print(fmt)
     return pack(fmt, address, tags, *values)
 
 

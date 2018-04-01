@@ -169,7 +169,7 @@ def tests_format():
         ]
     )
 
-    source, result = message_1
-    result = struct.pack('>%iB' % len(result), *result)
-    assert format_message(*source) == result
-    assert read_message(format_message(*source))[::2] == source
+    for msg in message_1, message_2:
+        source, result = msg
+        result = struct.pack('>%iB' % len(result), *result)
+        assert format_message(*source) == result
