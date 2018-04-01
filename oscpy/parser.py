@@ -97,7 +97,6 @@ def format_message(address, values):
         address += b'\0'
 
     fmt = b'>%is%is%s' % (padded(len(address)), padded(len(tags)), fmt)
-    print(fmt)
     return pack(fmt, address, tags, *values)
 
 
@@ -160,3 +159,23 @@ def read_bundle(data):
         messages.append((address, tags, values))
 
     return (timetag, messages)
+
+
+def read_packet(data, drop_late=False):
+    d = unpack_from('>c', data, 0)[0]
+    if d == b'/':
+        return [read_message(data)[::2]]
+
+    elif d == b'#':
+        timetag, messages = read_bundle(data)
+        if drop_late:
+            if timetag == (0, 1):
+                pass
+            else:
+                t = time()
+                if t > timetag[0]:
+                    return []
+                # XXX care about the fractionnal part later, maybe
+        return messages
+    else:
+        raise ValueError('packet is not a message or a bundle')
