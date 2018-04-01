@@ -20,11 +20,17 @@ def parse_float(value, offset=0):
 
 
 def parse_string(value, offset=0):
-    length = len(value)
-    return (
-        struct.unpack_from('%ss' % length, value, offset)[0].strip(b'\0'),
-        String.size * (length + 1)
-    )
+    result = []
+    n = 0
+    while True:
+        c = String.unpack_from(value, offset + n)[0]
+        n += String.size
+
+        if c == b'\0':
+            break
+        result.append(c)
+
+    return b''.join(result), padded(n)
 
 
 def parse_blob(value, offset=0):
@@ -34,7 +40,7 @@ def parse_blob(value, offset=0):
         '>%iQ' % length,
         value[offset + size:offset + size + struct.calcsize('%iQ' % length)]
     )
-    return data, length
+    return data, padded(length, 8)
 
 
 parsers = {
@@ -61,45 +67,20 @@ def parse(hint, value, offset=0):
 
 
 def read_message(data, offset=0):
-    n = 0
-    address = []
-    while True:
-        c = String.unpack_from(data, offset + n)[0]
-        print(c)
-        if n == 0 and c != b'/':
-            raise ValueError("address doesn't start with a '/'")
-        elif c == b'\0':
-            n += String.size
-            break
-        address.append(c)
-        n += String.size
+    address, size = parse_string(data, offset=offset)
+    n = size
+    if not address.startswith(b'/'):
+        raise ValueError("address {} doesn't start with a '/'".format(address))
 
-    n = padded(n)
-    tags = []
-    while True:
-        c = String.unpack_from(data, offset + n)[0]
-        print(n, c)
-        # XXX
-        # if not tags and c != b',':
-        #     raise ValueError("typetags string doesn't start with a ','")
-        if c == b'\0':
-            n += String.size
-            break
-        if c in parsers.keys():
-            tags.append(c)
-        elif tags:
-            ValueError('unrecognized symbol in typetag string: {}'.format(c))
-        n += String.size
+    tags, size = parse_string(data, offset=offset + n)
+    if not tags.startswith(b','):
+        raise ValueError("tag string {} doesn't start with a ','".format(tags))
+    tags = tags[1:]
 
-    n = padded(n)
-    address = b''.join(address)
-    tags = b''.join(tags)
-
-    n += String.size
+    n += size
 
     values = []
     for tag in tags:
-        print(n)
         v, off = parse(tag, data, offset=offset + n)
         values.append(v)
         n += off
