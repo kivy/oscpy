@@ -12,6 +12,12 @@ Goals:
 - robust (returns meaningful errors in case of malformed messages, always do the right thing on correct messages)
 - separation of concerns (message parsing vs communication)
 - sync and async compatibility (threads, asyncio, trio…)
+- clean and easy to read code
+
+features:
+- serialize and parse OSC data types/Messages/Bundles
+- a thread based udp server to open sockets and bind callbacks on osc addresses on them
+- a simple client
 
 
 usage:
@@ -19,33 +25,29 @@ usage:
 
 Server (thread)
 ```python
-    from oscpy import OSCThreadServer as OSC
+    from oscpy.server import OSCThreadServer as OSC
     from time import sleep
 
-    def callback(msg):
-        print(
-            "from={}, types={}, values={}".
-            .format(msg.from, msg.types, msg.values)
-        )
+    def callback(values):
+        print("got values: {}".format(values))
 
     osc = OSCThreadServer()
-    osc.bind('/address', callback)
-    osc.listen(address='0.0.0.0', port=8000)
+    sock = osc.listen(address='0.0.0.0', port=8000)
+    osc.bind(sock, b'/address', callback)
     sleep(1000)
     osc.stop()
 ```
 
-Server (async)
+Server (async) (TODO!)
 ```python
-    from oscpy import OSCThreadServer as OSC
-    from time import sleep
+    from oscpy.server import OSCThreadServer as OSC
 
     with OSCAsyncServer(port=8000) as OSC:
-        for msg in OSC.listen():
-           if msg.address == '/example':
-                print("got {} on /example".format(msg.values))
+        for address, values in OSC.listen():
+           if address == b'/example':
+                print("got {} on /example".format(values))
            else:
-                print("unsupported address {}".format(msg.address))
+                print("unknown address {}".format(address))
 ```
 
 Client
@@ -55,7 +57,7 @@ Client
 
     osc = OSCClient(address, port)
     for i in range(10):
-        osc.send([i])
+        osc.send(b'/ping', i)
 ```
 
 license
