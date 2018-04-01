@@ -136,7 +136,9 @@ def read_bundle(data):
 
     messages = []
     while offset < length:
-        size = Int.unpack_from(data, offset)
+        # NOTE, we don't really care about the size of the message, our
+        # parsing will compute it anyway
+        # size = Int.unpack_from(data, offset)
         offset += Int.size
         address, tags, values, off = read_message(data, offset)
         offset += off
