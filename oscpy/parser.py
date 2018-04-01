@@ -5,10 +5,8 @@ Float = Struct('>f')
 String = Struct('>s')
 TimeTag = Struct('>II')
 
-
-def padded(l, n=4):
-    m, r = divmod(l, n)
-    return n * (min(1, r) + l // n)
+def padded(l, n=3):
+    return l + n & ~n
 
 
 def parse_int(value, offset=0):
@@ -37,7 +35,7 @@ def parse_blob(value, offset=0):
     size = calcsize('>i')
     length = unpack_from('>i', value, offset)[0]
     data = unpack_from('>%iQ' % length, value, offset + size)
-    return data, padded(length, 8)
+    return data, padded(length, 7)
 
 
 parsers = {
@@ -58,9 +56,10 @@ writters = (
     (object, (b'b', b'%ib')),
 )
 
+# Note: padding is at n+1 (4 and 8)
 padsizes = {
-    bytes: 4,
-    object: 8
+    bytes: 3,
+    object: 7
 }
 
 
