@@ -122,6 +122,20 @@ def read_message(data, offset=0):
     return address, tags, values, n
 
 
+def format_bundle(data, timetag=None):
+    if not timetag:
+        timetag = (0, 1)
+    bundle = [pack('8s', b'#bundle\0')]
+    bundle.append(TimeTag.pack(*timetag))
+
+    for address, values in data:
+        msg = format_message(address, values)
+        bundle.append(pack('>i', len(msg)))
+        bundle.append(msg)
+
+    return b''.join(bundle)
+
+
 def read_bundle(data):
     length = len(data)
 
