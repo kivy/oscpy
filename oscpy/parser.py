@@ -1,9 +1,9 @@
-import struct
+from struct import Struct, pack, unpack, unpack_from, calcsize
 
-Int = struct.Struct('>i')
-Float = struct.Struct('>f')
-String = struct.Struct('>s')
-TimeTag = struct.Struct('>II')
+Int = Struct('>i')
+Float = Struct('>f')
+String = Struct('>s')
+TimeTag = Struct('>II')
 
 
 def padded(l, n=4):
@@ -34,12 +34,9 @@ def parse_string(value, offset=0):
 
 
 def parse_blob(value, offset=0):
-    size = struct.calcsize('>i')
-    length = struct.unpack_from('>i', value, offset)[0]
-    data = struct.unpack(
-        '>%iQ' % length,
-        value[offset + size:offset + size + struct.calcsize('%iQ' % length)]
-    )
+    size = calcsize('>i')
+    length = unpack_from('>i', value, offset)[0]
+    data = unpack_from('>%iQ' % length, value, offset + size)
     return data, padded(length, 8)
 
 
@@ -91,7 +88,7 @@ def read_message(data, offset=0):
 def read_bundle(data):
     length = len(data)
 
-    header = struct.unpack_from('7s', data, 0)[0]
+    header = unpack_from('7s', data, 0)[0]
     offset = 8 * String.size
     if header != b'#bundle':
         raise ValueError(
