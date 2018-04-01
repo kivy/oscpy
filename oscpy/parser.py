@@ -3,6 +3,7 @@ import struct
 Int = struct.Struct('>i')
 Float = struct.Struct('>f')
 String = struct.Struct('>s')
+TimeTag = struct.Struct('>II')
 
 
 def padded(l, n=4):
@@ -59,49 +60,65 @@ def parse(hint, value, offset=0):
     return parser(value, offset=offset)
 
 
-def read_message(data):
+def read_message(data, offset=0):
     n = 0
     address = []
     while True:
-        c = String.unpack_from(data, n)[0]
+        c = String.unpack_from(data, offset + n)[0]
         print(c)
         if n == 0 and c != b'/':
             raise ValueError("address doesn't start with a '/'")
         elif c == b'\0':
+            n += String.size
             break
         address.append(c)
-        n += 1
+        n += String.size
 
-    n += 1
     n = padded(n)
     tags = []
     while True:
-        c = String.unpack_from(data, n)[0]
+        c = String.unpack_from(data, offset + n)[0]
         print(n, c)
         # XXX
         # if not tags and c != b',':
         #     raise ValueError("typetags string doesn't start with a ','")
         if c == b'\0':
-            n += 1
+            n += String.size
             break
         if c in parsers.keys():
             tags.append(c)
         elif tags:
             ValueError('unrecognized symbol in typetag string: {}'.format(c))
-        n += 1
+        n += String.size
 
     n = padded(n)
     address = b''.join(address)
     tags = b''.join(tags)
 
-    print(address)
-    n += 1
+    n += String.size
 
     values = []
     for tag in tags:
         print(n)
-        v, offset = parse(tag, data, offset=n)
+        v, off = parse(tag, data, offset=offset + n)
         values.append(v)
-        n += offset
+        n += off
 
-    return address, tags, values
+    return address, tags, values, n
+
+
+def read_bundle(data):
+    length = len(data)
+
+    header = struct.unpack_from('7s', data, 0)
+    offset = 8 * String.size
+
+    timetag = TimeTag.unpack_from(data, offset)
+    offset += TimeTag.size
+
+    while offset < length:
+        size = Int.unpack_from(data, offset)
+        offset += Int.size
+        address, tags, values, off = read_message(data, offset)
+        offset += off
+        yield address, tags, values

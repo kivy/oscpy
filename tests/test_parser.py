@@ -1,4 +1,4 @@
-from oscpy.parser import parse, padded, read_message
+from oscpy.parser import parse, padded, read_message, read_bundle
 import struct
 
 
@@ -46,4 +46,27 @@ def test_read_message():
     assert read_message(
         struct.pack(
             fmt, address, b',', tags, *values)
-    ) == (address, tags, values)
+    )[:-1] == (address, tags, values)
+
+
+def test_read_bundle():
+    pad = padded(len('#bundle'))
+    data = struct.pack('>%isQ' % pad, b'#bundle', 1)
+
+    tests = (
+        (b'/a', [1]),
+        (b'/b', [2]),
+        (b'/c', [3]),
+        (b'/d', [4]),
+        (b'/e', [5]),
+    )
+
+    for addr, value in tests:
+        fmt = b'>%isc%is%ii' % (padded(len(addr)), padded(2), len(value))
+
+        msg = struct.pack(fmt, addr, b',', b'i', *value)
+        assert read_message(msg)[::2] == (addr, value)
+        data += struct.pack('>i', len(msg)) + msg
+
+    for i, r in enumerate(read_bundle(data)):
+        assert (r[0], r[2]) == tests[i]
