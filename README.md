@@ -1,6 +1,8 @@
 OSCPy
 =====
 
+/!\ This is very much a work in progress /!\
+
 A modern implementation of OSC for python2/3.
 
 Goals:
