@@ -9,7 +9,7 @@ class OSCThreadServer(object):
     def __init__(self, drop_late_bundles=False):
         self.addresses = {}
         self.sockets = []
-        self.timeout = 0
+        self.timeout = 0.01
         self.drop_late_bundles = drop_late_bundles
         t = Thread(target=self._listen)
         t.daemon = True
@@ -43,6 +43,6 @@ class OSCThreadServer(object):
 
             for s in read:
                 data = s.recv(1024)
-                for address, values in read_packet(data):
+                for address, types, values, offset in read_packet(data):
                     for cb in self.addresses.get((s, address), []):
                         cb(*values)

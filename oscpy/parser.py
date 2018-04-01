@@ -156,7 +156,7 @@ def read_bundle(data):
         offset += Int.size
         address, tags, values, off = read_message(data, offset)
         offset += off
-        messages.append((address, tags, values))
+        messages.append((address, tags, values, offset))
 
     return (timetag, messages)
 
@@ -164,7 +164,7 @@ def read_bundle(data):
 def read_packet(data, drop_late=False):
     d = unpack_from('>c', data, 0)[0]
     if d == b'/':
-        return [read_message(data)[::2]]
+        return [read_message(data)]
 
     elif d == b'#':
         timetag, messages = read_bundle(data)
