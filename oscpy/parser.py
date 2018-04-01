@@ -1,4 +1,4 @@
-from struct import Struct, unpack_from, calcsize
+from struct import Struct, pack, unpack_from, calcsize
 
 Int = Struct('>i')
 Float = Struct('>f')
@@ -51,6 +51,13 @@ parsers = {
     ord('b'): parse_blob,
 }
 
+writters = (
+    (float, (b'f', b'f')),
+    (int, (b'i', b'i')),
+    (bytes, (b's', b'%is')),
+    (object, (b'b', b'%ib')),
+)
+
 
 def parse(hint, value, offset=0):
     parser = parsers.get(hint)
@@ -61,6 +68,26 @@ def parse(hint, value, offset=0):
         )
 
     return parser(value, offset=offset)
+
+
+def format_message(address, values):
+    tags = [b',']
+    fmt = []
+    for v in values:
+        for cls, writter in writters:
+            if isinstance(v, cls):
+                tag, f = writter
+                if b'%i' in f:
+                    f = f % len(v)
+                tags.append(tag)
+                fmt.append(f)
+                break
+
+    fmt = b''.join(fmt)
+    tags = b''.join(tags)
+
+    fmt = b'>%is%is%s' % (padded(len(address)), padded(len(tags)), fmt)
+    return pack(fmt, address, tags, *values)
 
 
 def read_message(data, offset=0):
