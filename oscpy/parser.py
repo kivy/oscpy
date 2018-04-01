@@ -91,15 +91,21 @@ def read_message(data, offset=0):
 def read_bundle(data):
     length = len(data)
 
-    header = struct.unpack_from('7s', data, 0)
+    header = struct.unpack_from('7s', data, 0)[0]
     offset = 8 * String.size
+    if header != b'#bundle':
+        raise ValueError(
+            "the message doesn't start with '#bundle': {}".format(header))
 
     timetag = TimeTag.unpack_from(data, offset)
     offset += TimeTag.size
 
+    messages = []
     while offset < length:
         size = Int.unpack_from(data, offset)
         offset += Int.size
         address, tags, values, off = read_message(data, offset)
         offset += off
-        yield address, tags, values
+        messages.append((address, tags, values))
+
+    return (timetag, messages)

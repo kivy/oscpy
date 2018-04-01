@@ -98,5 +98,6 @@ def test_read_bundle():
         assert read_message(msg)[::2] == expected
         data += struct.pack('>i', len(msg)) + msg
 
-    for i, r in enumerate(read_bundle(data)):
+    timetag, messages = read_bundle(data)
+    for i, r in enumerate(messages):
         assert (r[0], r[2]) == tests[i][1]
