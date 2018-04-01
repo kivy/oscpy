@@ -1,4 +1,4 @@
-from struct import Struct, pack, unpack, unpack_from, calcsize
+from struct import Struct, unpack_from, calcsize
 
 Int = Struct('>i')
 Float = Struct('>f')
