@@ -48,3 +48,9 @@ class OSCThreadServer(object):
                 ):
                     for cb in self.addresses.get((s, address), []):
                         cb(*values)
+
+    def address(self, sock, address):
+        def decorator(callback):
+            self.bind(sock, address, callback)
+            return callback
+        return decorator

@@ -38,6 +38,24 @@ Server (thread)
     osc.stop()
 ```
 
+or you can use the decorator API.
+
+Server (thread)
+```python
+    from oscpy.server import OSCThreadServer as OSC
+    from time import sleep
+
+    osc = OSCThreadServer()
+    sock = osc.listen(address='0.0.0.0', port=8000)
+
+    @osc.address(sock, b'/address')
+    def callback(values):
+        print("got values: {}".format(values))
+
+    sleep(1000)
+    osc.stop()
+```
+
 Server (async) (TODO!)
 ```python
     from oscpy.server import OSCThreadServer as OSC
