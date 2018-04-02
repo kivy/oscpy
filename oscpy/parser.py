@@ -10,6 +10,7 @@ TP_PACKET_FORMAT = "!12I"
 # 1970-01-01 00:00:00
 NTP_DELTA = 2208988800
 
+
 def padded(l, n=4):
     m, r = divmod(l, n)
     return n * (min(1, r) + l // n)

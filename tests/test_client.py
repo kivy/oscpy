@@ -12,7 +12,7 @@ def test_send_message():
     def success(*values):
         acc.append(values[0])
 
-    osc.bind(sock, b'/success', success)
+    osc.bind(b'/success', success, sock)
 
     timeout = time() + 5
     while len(acc) < 100:
@@ -31,7 +31,7 @@ def test_send_bundle():
     def success(*values):
         acc.append(values[0])
 
-    osc.bind(sock, b'/success', success)
+    osc.bind(b'/success', success, sock)
 
     timeout = time() + 5
     while len(acc) < 100:
@@ -56,16 +56,16 @@ def test_oscclient():
     def success(*values):
         acc.append(values[0])
 
-    osc.bind(sock, b'/success', success)
+    osc.bind(b'/success', success, sock)
 
     client = OSCClient('localhost', port)
 
     timeout = time() + 5
     while len(acc) < 50:
-        if time() > timeout:
+       if time() > timeout:
             raise OSError('timeout while waiting for  success message.')
 
-        client.send_message(b'/success', [1])
+       client.send_message(b'/success', [1])
 
     while len(acc) < 100:
         if time() > timeout:
@@ -92,8 +92,8 @@ def test_timetag():
     def failure(*values):
         acc.append(False)
 
-    osc.bind(sock, b'/success', success)
-    osc.bind(sock, b'/failure', failure)
+    osc.bind(b'/success', success, sock)
+    osc.bind(b'/failure', failure, sock)
 
     client = OSCClient('localhost', port)
 
