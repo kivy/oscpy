@@ -3,6 +3,7 @@ from time import time
 
 from oscpy.server import OSCThreadServer
 from oscpy.parser import format_message
+from oscpy.client import send_message, send_bundle
 
 
 def test_instance():
@@ -26,16 +27,12 @@ def test_bind():
 
     osc.bind(sock, b'/success', success)
 
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.sendto(
-        format_message(b'/success', [b"test", b"test", 1, 1.2345]),
-        ('localhost', port)
-    )
+    send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port)
 
     timeout = time() + 5
     while not cont:
         if time() > timeout:
-            raise OSError('timeout while waiting for  success message.')
+            raise OSError('timeout while waiting for success message.')
 
 
 def test_decorator():
@@ -44,17 +41,13 @@ def test_decorator():
     port = sock.getsockname()[1]
     cont = []
 
-    @osc.address(sock, '/success')
+    @osc.address(sock, b'/success')
     def success(*values):
         cont.append(True)
 
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.sendto(
-        format_message(b'/success', [b"test", b"test", 1, 1.2345]),
-        ('localhost', port)
-    )
+    send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port)
 
-    timeout = time() + 5
+    timeout = time() + 1
     while not cont:
         if time() > timeout:
-            raise OSError('timeout while waiting for  success message.')
+            raise OSError('timeout while waiting for success message.')
