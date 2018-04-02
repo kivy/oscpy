@@ -27,9 +27,6 @@ def send_bundle(messages, ip_address, port, timetag=None):
     timetag is optional but can be a float of the number of seconds
     since 1970 when the events described in the bundle should happen.
     '''
-    if timetag:
-        timetag = divmod(timetag, 1)
-
     sock.sendto(
         format_bundle(messages, timetag=timetag),
         (ip_address, port),

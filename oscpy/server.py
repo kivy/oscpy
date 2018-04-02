@@ -43,6 +43,8 @@ class OSCThreadServer(object):
 
             for s in read:
                 data = s.recv(1024)
-                for address, types, values, offset in read_packet(data):
+                for address, types, values, offset in read_packet(
+                    data, drop_late=self.drop_late_bundles
+                ):
                     for cb in self.addresses.get((s, address), []):
                         cb(*values)

@@ -1,10 +1,14 @@
 from struct import Struct, pack, unpack_from, calcsize
+from time import time
 
 Int = Struct('>i')
 Float = Struct('>f')
 String = Struct('>s')
 TimeTag = Struct('>II')
 
+TP_PACKET_FORMAT = "!12I"
+# 1970-01-01 00:00:00
+NTP_DELTA = 2208988800
 
 def padded(l, n=4):
     m, r = divmod(l, n)
@@ -122,9 +126,26 @@ def read_message(data, offset=0):
     return address, tags, values, n
 
 
+def time_to_timetag(timetag):
+    if timetag is None:
+        return (0, 1)
+    seconds, fract = divmod(timetag, 1)
+    seconds += NTP_DELTA
+    seconds = int(seconds)
+    fract = int(fract * 2**32)
+    return (seconds, fract)
+
+
+def timetag_to_time(timetag):
+    if timetag == (0, 1):
+        return time()
+
+    seconds, fract = timetag
+    return seconds + fract / 2. ** 32 - NTP_DELTA
+
+
 def format_bundle(data, timetag=None):
-    if not timetag:
-        timetag = (0, 1)
+    timetag = time_to_timetag(timetag)
     bundle = [pack('8s', b'#bundle\0')]
     bundle.append(TimeTag.pack(*timetag))
 
@@ -145,7 +166,7 @@ def read_bundle(data):
         raise ValueError(
             "the message doesn't start with '#bundle': {}".format(header))
 
-    timetag = TimeTag.unpack_from(data, offset)
+    timetag = timetag_to_time(TimeTag.unpack_from(data, offset))
     offset += TimeTag.size
 
     messages = []
@@ -169,13 +190,8 @@ def read_packet(data, drop_late=False):
     elif d == b'#':
         timetag, messages = read_bundle(data)
         if drop_late:
-            if timetag == (0, 1):
-                pass
-            else:
-                t = time()
-                if t > timetag[0]:
-                    return []
-                # XXX care about the fractionnal part later, maybe
+            if time() > timetag:
+                return []
         return messages
     else:
         raise ValueError('packet is not a message or a bundle')

@@ -1,8 +1,9 @@
 from oscpy.parser import (
     parse, padded, read_message, read_bundle, format_message,
-    format_bundle
+    format_bundle, timetag_to_time, time_to_timetag
 )
 from pytest import approx
+from time import time
 import struct
 
 # example messages from
@@ -125,7 +126,12 @@ def test_format_bundle():
 
     timetag, messages = read_bundle(bundle)
 
-    assert timetag == (0, 1)
+    assert timetag == approx(time())
     assert len(messages) == 2
     assert messages[0][::2] == message_1[2]
     assert messages[1][::2] == message_2[2]
+
+
+def test_timetag():
+    assert time_to_timetag(None) == (0, 1)
+    assert time_to_timetag(0)[1] == 0
