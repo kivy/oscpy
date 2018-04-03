@@ -103,7 +103,7 @@ def test_answer():
 
     osc_2.send_message(b'/ping', [], *osc_1.getaddress())
 
-    timeout = time() + 1
+    timeout = time() + 2
     while not cont:
         if time() > timeout:
             raise OSError('timeout while waiting for success message.')

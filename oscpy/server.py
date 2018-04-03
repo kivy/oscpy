@@ -2,6 +2,7 @@ from threading import Thread
 from select import select
 import socket
 import inspect
+from time import sleep
 
 from oscpy.parser import read_packet
 from oscpy.client import send_bundle, send_message
@@ -69,6 +70,9 @@ class OSCThreadServer(object):
 
     def _listen(self):
         while True:
+            if not self.sockets:
+                sleep(.01)
+                continue
             read, write, error = select(self.sockets, [], [], self.timeout)
 
             for sender_socket in read:
