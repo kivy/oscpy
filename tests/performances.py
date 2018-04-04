@@ -47,12 +47,11 @@ def count(*values):
 
 timeout = time() + DURATION
 sent = 0
-delay = 10 ** -9
 
 while time() < timeout:
     send_message(b'/count', [b'test', b'auie nstau', 1.2345], address, port)
     sent += 1
-    sleep(delay)
+    # sleep(delay)
 
 print(
     "sent: {} ({}/s), received: {} ({}/s)"

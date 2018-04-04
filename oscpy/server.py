@@ -38,7 +38,7 @@ class OSCThreadServer(object):
         '''
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((address, port))
-        sock.setblocking(0)
+        # sock.setblocking(0)
         self.sockets.append(sock)
         if default and not self.default_socket:
             self.default_socket = sock
@@ -70,15 +70,19 @@ class OSCThreadServer(object):
 
     def _listen(self):
         while True:
+            drop_late = self.drop_late_bundles
             if not self.sockets:
                 sleep(.01)
                 continue
-            read, write, error = select(self.sockets, [], [], self.timeout)
+            elif len(self.sockets) < 5:
+                read = self.sockets
+            else:
+                read, write, error = select(self.sockets, [], [], self.timeout)
 
             for sender_socket in read:
-                data, sender = sender_socket.recvfrom(1024)
+                data, sender = sender_socket.recvfrom(65535)
                 for address, types, values, offset in read_packet(
-                    data, drop_late=self.drop_late_bundles
+                    data, drop_late=drop_late
                 ):
                     for cb in self.addresses.get((sender_socket, address), []):
                         cb(*values)
@@ -116,10 +120,10 @@ class OSCThreadServer(object):
             values = []
         frames = inspect.getouterframes(inspect.currentframe())
         for frame, filename, line, function, lines, index in frames:
-            if filename == __file__ and function == '_listen':
+            if function == '_listen' and __file__.startswith(filename):
                 break
         else:
-            raise RuntimeError('answer() called not from a callback')
+            raise RuntimeError('answer() not called from a callback')
 
         ip_address, port = frame.f_locals.get('sender')
         sock = frame.f_locals.get('sender_socket')

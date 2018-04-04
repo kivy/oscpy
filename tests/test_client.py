@@ -100,13 +100,13 @@ def test_timetag():
     timeout = time() + 5
     while len(acc) < 50:
         if time() > timeout:
-            raise OSError('timeout while waiting for  success message.')
+            raise OSError('timeout while waiting for success message.')
 
         client.send_message(b'/success', [1])
 
     while len(acc) < 100:
         if time() > timeout:
-            raise OSError('timeout while waiting for  success message.')
+            raise OSError('timeout while waiting for success message.')
 
         client.send_bundle(
             [
