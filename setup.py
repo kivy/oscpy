@@ -13,7 +13,7 @@ URL = 'https://github.com/tshirtman/oscpy'
 setup(
     name='oscpy',
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.1.1',
+    version='0.1.2',
     description='A modern and efficient OSC Client/Server implementation',
     long_description=long_description,
     url=URL,
@@ -22,10 +22,10 @@ setup(
     classifiers=[  # Optional
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
-        'Multimedia :: Sound/Audio',
-        'Software Development :: Libraries',
-        'System :: Networking',
-        'License :: OSI Approved :: MIT License',
+        'Topic ::Multimedia :: Sound/Audio',
+        'Topic ::Software Development :: Libraries',
+        'Topic ::System :: Networking',
+        'Topic ::License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
