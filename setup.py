@@ -20,9 +20,11 @@ setup(
     author='Gabriel Pettier',
     author_email='gabriel.pettier@gmail.com',  # Optional
     classifiers=[  # Optional
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
-        'Topic :: Software Development :: Network Library',
+        'Multimedia :: Sound/Audio',
+        'Software Development :: Libraries',
+        'System :: Networking',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
