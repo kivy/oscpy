@@ -1,6 +1,6 @@
 from oscpy.client import send_message, send_bundle, OSCClient
 from oscpy.server import OSCThreadServer
-from time import time
+from time import time, sleep
 
 
 def test_send_message():
@@ -62,10 +62,10 @@ def test_oscclient():
 
     timeout = time() + 5
     while len(acc) < 50:
-       if time() > timeout:
+        if time() > timeout:
             raise OSError('timeout while waiting for  success message.')
 
-       client.send_message(b'/success', [1])
+        client.send_message(b'/success', [1])
 
     while len(acc) < 100:
         if time() > timeout:
@@ -86,14 +86,13 @@ def test_timetag():
     port = sock.getsockname()[1]
     acc = []
 
+    @osc.address(b'/success', sock)
     def success(*values):
         acc.append(True)
 
+    @osc.address(b'/failure', sock)
     def failure(*values):
         acc.append(False)
-
-    osc.bind(b'/success', success, sock)
-    osc.bind(b'/failure', failure, sock)
 
     client = OSCClient('localhost', port)
 
@@ -124,5 +123,5 @@ def test_timetag():
             timetag=time()
         )
 
-    if False in acc:
-        assert False
+    assert True in acc
+    assert False not in acc

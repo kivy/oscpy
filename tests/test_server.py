@@ -1,13 +1,11 @@
-import socket
-from time import time
+from time import time, sleep
 
 from oscpy.server import OSCThreadServer
-from oscpy.parser import format_message
-from oscpy.client import send_message, send_bundle
+from oscpy.client import send_message
 
 
 def test_instance():
-    osc = OSCThreadServer()
+    OSCThreadServer()
 
 
 def test_listen():
@@ -33,6 +31,35 @@ def test_bind():
     while not cont:
         if time() > timeout:
             raise OSError('timeout while waiting for success message.')
+
+
+def test_bind_multi():
+    osc = OSCThreadServer()
+    sock1 = osc.listen()
+    port1 = sock1.getsockname()[1]
+
+    sock2 = osc.listen()
+    port2 = sock2.getsockname()[1]
+    cont = []
+
+    def success1(*values):
+        cont.append(True)
+
+    def success2(*values):
+        cont.append(False)
+
+    osc.bind(b'/success', success1, sock1)
+    osc.bind(b'/success', success2, sock2)
+
+    send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port1)
+    send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port2)
+
+    timeout = time() + 5
+    while len(cont) < 2:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+
+    assert True in cont and False in cont
 
 
 def test_bind_default():
@@ -107,3 +134,4 @@ def test_answer():
     while not cont:
         if time() > timeout:
             raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
