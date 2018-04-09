@@ -47,7 +47,6 @@ patterns = [
 
 print("#" * 80)
 print("sending/receiving test")
-osc = OSCThreadServer()
 # address, port = osc.getaddress()
 
 received = 0
@@ -59,6 +58,7 @@ def count(*values):
 
 
 for family in 'unix', 'inet':
+    osc = OSCThreadServer()
     print(f"family: {family}")
     if family == 'unix':
         address, port = '/tmp/test_sock', 0
@@ -70,26 +70,28 @@ for family in 'unix', 'inet':
         address, port = osc.getaddress(sock)
 
     osc.bind(b'/count', count, sock=sock)
-    for pattern in patterns:
-        timeout = time() + DURATION
-        sent = 0
-        received = 0
+    for i, pattern in enumerate(patterns):
+        for safer in (False, True):
+            timeout = time() + DURATION
+            sent = 0
+            received = 0
 
-        print("*" * 100)
-        # print(f"pattern: {pattern}")
+            while time() < timeout:
+                send_message(
+                    b'/count', pattern, address, port, sock=SOCK, safer=safer
+                )
+                sent += 1
+            sleep(10e-9)
 
-        while time() < timeout:
-            send_message(b'/count', pattern, address, port, sock=SOCK)
-            sent += 1
+            size = len(format_message(b'/count', pattern)) / 1000.
 
-        size = len(format_message(b'/count', pattern)) / 1000.
+            print(
+                f"{i}: safe: {safer}\t",
+                f"sent:\t{sent}\t({sent / DURATION}/s)\t({sent * size / DURATION:.2f}MB/s)\t"                  # noqa
+                f"received:\t{received}\t({received / DURATION}/s)\t({received * size / DURATION:.2f}MB/s)\t"  # noqa
+                f"loss {((sent - received) / sent) * 100}%"
+            )
 
-        print(
-            f"sent: {sent} ({sent / DURATION}/s) ({sent * size / DURATION:.2f}MB/s)\n"                 # noqa
-            f"received: {received} ({received / DURATION}/s)({received * size / DURATION:.2f}MB/s)\n"  # noqa
-            f"loss {((sent - received) / sent) * 100}%"
-        )
-
-    osc.unbind(b'/count', count, sock=sock)
     if family == 'unix':
         os.unlink(address)
+    osc.stop_all()
