@@ -5,6 +5,7 @@ import socket
 import inspect
 from time import sleep
 import os
+import re
 
 from oscpy.parser import read_packet
 from oscpy.client import send_bundle, send_message
@@ -14,7 +15,8 @@ class OSCThreadServer(object):
     '''Listen for osc messages in a thread, and dispatches the messages
     values to callbacks from there.
     '''
-    def __init__(self, drop_late_bundles=False, timeout=0.01):
+
+    def __init__(self, drop_late_bundles=False, timeout=0.01, advanced_matching=False):
         '''
         - `timeout` is a number of seconds used as a time limit for
           select() calls in the listening thread, optiomal, defaults to
@@ -22,15 +24,23 @@ class OSCThreadServer(object):
         - `drop_late_bundles` instruct the server not to dispatch calls
           from bundles that arrived after their timetag value.
           (optional, defaults to False)
+        - `advanced_matching` (defaults to False), setting this to True
+          activate the pattern matching part of the specification, let
+          this to False if you don't need it, as it triggers a lot more
+          computation for each received message.
         '''
         self.addresses = {}
         self.sockets = []
         self.timeout = timeout
         self.default_socket = None
         self.drop_late_bundles = drop_late_bundles
+        self.advanced_matching = advanced_matching
         t = Thread(target=self._listen)
         t.daemon = True
         t.start()
+
+        self._smart_address_cache = {}
+        self._smart_part_cache = {}
 
     def bind(self, address, callback, sock=None):
         '''Bind a callback to an osc address, a socket in the list of
@@ -45,10 +55,65 @@ class OSCThreadServer(object):
         elif not sock:
             raise RuntimeError('no default socket yet and no socket provided')
 
+        if self.advanced_matching:
+            address = self.create_smart_address(address)
+
         callbacks = self.addresses.get((sock, address), [])
         if callback not in callbacks:
             callbacks.append(callback)
         self.addresses[(sock, address)] = callbacks
+
+    def create_smart_address(self, address):
+        cache = self._smart_address_cache
+
+        if address in cache:
+            return cache[address]
+
+        else:
+            parts = address.split(b'/')
+            smart_parts = tuple(
+                re.compile(self._convert_part_to_regex(part)) for part in parts
+            )
+            cache[address] = smart_parts
+            return smart_parts
+
+    def _convert_part_to_regex(self, part):
+        cache = self._smart_part_cache
+
+        if part in cache:
+            return cache[part]
+
+        else:
+            r = [b'^']
+            for i, _ in enumerate(part):
+                # getting a 1 char byte string instead of an int in
+                # python3
+                c = part[i:i + 1]
+                if c == b'?':
+                    r.append(b'.')
+                elif c == b'*':
+                    r.append(b'.*')
+                elif c == b'[':
+                    r.append(b'[')
+                elif c == b'!' and r and r[-1] == '[':
+                    r.append(b'^')
+                elif c == b']':
+                    r.append(b']')
+                elif c == b'{':
+                    r.append(b'(')
+                elif c == b',':
+                    r.append(b'|')
+                elif c == b'}':
+                    r.append(b')')
+                else:
+                    r.append(c)
+
+            r.append(b'$')
+
+            smart_part = re.compile(b''.join(r))
+
+            cache[part] = smart_part
+            return smart_part
 
     def unbind(self, address, callback, sock=None):
         '''Un bind a callback from an address.
@@ -147,6 +212,10 @@ class OSCThreadServer(object):
         messages on the server's sockets, and calling the callbacks when
         messages are received.
         '''
+        match = self._match_address
+        advanced_matching = self.advanced_matching
+        addresses = self.addresses
+
         while True:
             drop_late = self.drop_late_bundles
             if not self.sockets:
@@ -162,8 +231,30 @@ class OSCThreadServer(object):
                 for address, types, values, offset in read_packet(
                     data, drop_late=drop_late
                 ):
-                    for cb in self.addresses.get((sender_socket, address), []):
-                        cb(*values)
+                    if advanced_matching:
+                        for sock, addr in addresses:
+                            if sock == sender_socket and match(addr, address):
+                                for cb in addresses[(sock, addr)]:
+                                    cb(*values)
+
+                    else:
+                        for cb in addresses.get((sender_socket, address), []):
+                            cb(*values)
+
+    @staticmethod
+    def _match_address(smart_address, target_address):
+        '''(internal) a smart_address is a list of regexps to match
+        against the parts of the target address
+        '''
+        target_parts = target_address.split(b'/')
+        if len(target_parts) != len(smart_address):
+            return False
+
+        return all(
+            model.match(part)
+            for model, part in
+            zip(smart_address, target_parts)
+        )
 
     def send_message(
         self, osc_address, values, ip_address, port, sock=None, safer=False
