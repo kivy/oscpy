@@ -1,3 +1,4 @@
+import pytest
 from time import time, sleep
 
 from oscpy.server import OSCThreadServer
@@ -60,6 +61,16 @@ def test_bind_multi():
             raise OSError('timeout while waiting for success message.')
 
     assert True in cont and False in cont
+
+
+def test_bind_no_default():
+    osc = OSCThreadServer()
+
+    def success(*values):
+        pass
+
+    with pytest.raises(RuntimeError) as e_info:
+        osc.bind(b'/success', success)
 
 
 def test_bind_default():
