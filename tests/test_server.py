@@ -34,6 +34,48 @@ def test_bind():
             raise OSError('timeout while waiting for success message.')
 
 
+def test_unbind():
+    osc = OSCThreadServer()
+    sock = osc.listen()
+    port = sock.getsockname()[1]
+    cont = []
+
+    def failure(*values):
+        cont.append(True)
+
+    osc.bind(b'/failure', failure, sock)
+    with pytest.raises(RuntimeError) as e_info:
+        osc.unbind(b'/failure', failure)
+    osc.unbind(b'/failure', failure, sock)
+
+    send_message(b'/failure', [b'test', 1, 1.12345], 'localhost', port)
+
+    timeout = time() + 1
+    while time() > timeout:
+        assert not cont
+        sleep(10e-9)
+
+
+def test_unbind_default():
+    osc = OSCThreadServer()
+    sock = osc.listen(default=True)
+    port = sock.getsockname()[1]
+    cont = []
+
+    def failure(*values):
+        cont.append(True)
+
+    osc.bind(b'/failure', failure)
+    osc.unbind(b'/failure', failure)
+
+    send_message(b'/failure', [b'test', 1, 1.12345], 'localhost', port)
+
+    timeout = time() + 1
+    while time() > timeout:
+        assert not cont
+        sleep(10e-9)
+
+
 def test_bind_multi():
     osc = OSCThreadServer()
     sock1 = osc.listen()
@@ -160,6 +202,11 @@ def test_smart_address_match():
     assert not osc._match_address(address, b'/test//stuff')
     assert not osc._match_address(address, b'/test/stuffstuff')
     assert not osc._match_address(address, b'/testtest/stuff')
+
+
+def test_smart_address_cache():
+    osc = OSCThreadServer(advanced_matching=True)
+    assert osc.create_smart_address(b'/a') == osc.create_smart_address(b'/a')
 
 
 def test_advanced_matching():
