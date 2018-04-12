@@ -113,11 +113,11 @@ Client
 ```
 
 TODO:
-- address matching (outside of the currently supported *exact* matching)
+- [x] address matching (outside of the currently supported *exact* matching)
 - real support for timetag (currently only supports optionally dropping late bundles, not delaying those with timetags in the future)
 - support for additional arguments types
 - an asyncio-oriented server implementation
-- performances assessment (profiling and comparison with other implementations)
+- [x] performances assessment (profiling and comparison with other implementations)
 - examples & documentation
 
 license
