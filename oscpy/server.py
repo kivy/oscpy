@@ -95,7 +95,7 @@ class OSCThreadServer(object):
                     r.append(b'.*')
                 elif c == b'[':
                     r.append(b'[')
-                elif c == b'!' and r and r[-1] == '[':
+                elif c == b'!' and r and r[-1] == b'[':
                     r.append(b'^')
                 elif c == b']':
                     r.append(b']')
