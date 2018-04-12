@@ -137,7 +137,8 @@ class OSCThreadServer(object):
         - `family` accept the 'unix' and 'inet' values, a socket of the
           corresponding type will be created.
           If family is 'unix', then the address must be a filename, the
-          'port' value won't be used.
+          'port' value won't be used. 'unix' sockets are not defined on
+          windows.
 
         The socket created to listen is returned, and can be used later
         with methods accepting the `sock` parameter.

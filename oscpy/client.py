@@ -1,6 +1,7 @@
 import socket
 from oscpy.parser import format_message, format_bundle
 from time import sleep
+from sys import platform
 
 SOCK = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -30,11 +31,13 @@ def send_message(
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         send_message(b'/test', [], '192.168.0.1', 8000, sock=sock, safer=True)
 
+        # unix sockets works on linux and osx, and over unix platforms,
+        # but not windows
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
         send_message(b'/some/address', [1, 2, 3], b'/tmp/sock')
 
     '''
-    if sock.family == socket.AF_UNIX:
+    if platform != 'win32' and sock.family == socket.AF_UNIX:
         address = ip_address
     else:
         address = (ip_address, port)
