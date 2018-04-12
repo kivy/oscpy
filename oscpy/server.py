@@ -6,6 +6,7 @@ import inspect
 from time import sleep
 import os
 import re
+from sys import platform
 
 from oscpy.parser import read_packet
 from oscpy.client import send_bundle, send_message
@@ -169,11 +170,16 @@ class OSCThreadServer(object):
             )
         return sock
 
-    def close(self, sock):
+    def close(self, sock=None):
         '''close a socket opened by the server.
         '''
-        if socket.family == 'unix':
-            os.path.unlink(sock.address)
+        if not sock and self.default_socket:
+            sock = self.default_socket
+        elif not sock:
+            raise RuntimeError('no default socket yet and no socket provided')
+
+        if platform != 'win32' and sock.family == socket.AF_UNIX:
+            os.unlink(sock.getsockname())
         else:
             sock.close()
 

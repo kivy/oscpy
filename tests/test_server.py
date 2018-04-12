@@ -1,5 +1,10 @@
 import pytest
 from time import time, sleep
+from sys import platform
+import socket
+from tempfile import mktemp
+from os.path import exists
+from os import unlink
 
 from oscpy.server import OSCThreadServer
 from oscpy.client import send_message, send_bundle
@@ -13,6 +18,34 @@ def test_listen():
     osc = OSCThreadServer()
     sock = osc.listen()
     osc.stop(sock)
+
+
+def test_listen_default():
+    osc = OSCThreadServer()
+    sock = osc.listen(default=True)
+
+    with pytest.raises(RuntimeError) as e_info:
+        osc.listen(default=True)
+
+    osc.close(sock)
+    osc.listen(default=True)
+
+
+def test_close():
+    osc = OSCThreadServer()
+    osc.listen(default=True)
+
+    osc.close()
+    with pytest.raises(RuntimeError) as e_info:
+        osc.close()
+
+    if platform != 'win32':
+        filename = mktemp()
+        unix = osc.listen(address=filename, family='unix')
+        assert exists(filename)
+        osc.close(unix)
+        assert not exists(filename)
+
 
 
 def test_bind():
@@ -427,7 +460,11 @@ def test_answer():
         if True in values:
             cont.append(True)
         else:
-            osc_1.answer(b'/pong')
+            osc_1.answer(
+                bundle=[
+                    (b'/pong', [])
+                ]
+            )
 
     osc_2 = OSCThreadServer()
     osc_2.listen(default=True)
@@ -439,8 +476,29 @@ def test_answer():
 
     osc_2.send_message(b'/ping', [], *osc_1.getaddress())
 
+    with pytest.raises(RuntimeError) as e_info:
+        osc_1.answer(b'/bing', [])
+
     timeout = time() + 2
     while not cont:
         if time() > timeout:
             raise OSError('timeout while waiting for success message.')
         sleep(10e-9)
+
+
+def test_socket_family():
+    osc = OSCThreadServer()
+    assert osc.listen().family == socket.AF_INET
+    filename = mktemp()
+    if platform != 'win32':
+        assert osc.listen(address=filename, family='unix').family == socket.AF_UNIX  # noqa
+
+    else:
+        with pytest.raises(NameError) as e_info:
+            osc.listen(address=filename, family='unix')
+
+    if exists(filename):
+        unlink(filename)
+
+    with pytest.raises(ValueError) as e_info:
+        osc.listen(family='')
