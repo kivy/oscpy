@@ -138,6 +138,27 @@ def test_bind_multi():
     assert True in cont and False in cont
 
 
+def test_bind_address():
+    osc = OSCThreadServer()
+    osc.listen(default=True)
+    result = []
+
+    @osc.address(b'/test')
+    def success(*args):
+        result.append(True)
+
+    timeout = time() + 1
+
+    send_message(b'/test', [], *osc.getaddress())
+
+    while len(result) < 1:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
+
+    assert True in result
+
+
 def test_bind_no_default():
     osc = OSCThreadServer()
 
