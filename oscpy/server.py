@@ -328,7 +328,7 @@ class OSCThreadServer(object):
             self.send_message(address, values, ip_address, port, sock=sock)
 
     def address(self, address, sock=None):
-        '''Decorator method to allow binding functions/methods from their definition
+        '''Decorator method to allow binding functions from their definition
 
         address is the osc address to bind to the callback
 
@@ -341,13 +341,13 @@ class OSCThreadServer(object):
                 print(values)
 
             send_message(b'/printer', [b'hello world'])
-        '''
-        if not sock and self.default_socket:
-            sock = self.default_socket
-        elif not sock:
-            raise RuntimeError('no default socket yet and no socket provided')
 
+        note:
+            this won't work on methods as it'll call them as normal
+            functions, and the callback won't get a `self` argument.
+        '''
         def decorator(callback):
             self.bind(address, callback, sock)
             return callback
+
         return decorator
