@@ -24,7 +24,7 @@ def test_listen_default():
     osc = OSCThreadServer()
     sock = osc.listen(default=True)
 
-    with pytest.raises(RuntimeError) as e_info:
+    with pytest.raises(RuntimeError) as e_info:  # noqa
         osc.listen(default=True)
 
     osc.close(sock)
@@ -36,7 +36,7 @@ def test_close():
     osc.listen(default=True)
 
     osc.close()
-    with pytest.raises(RuntimeError) as e_info:
+    with pytest.raises(RuntimeError) as e_info:  # noqa
         osc.close()
 
     if platform != 'win32':
@@ -45,7 +45,6 @@ def test_close():
         assert exists(filename)
         osc.close(unix)
         assert not exists(filename)
-
 
 
 def test_bind():
@@ -77,7 +76,7 @@ def test_unbind():
         cont.append(True)
 
     osc.bind(b'/failure', failure, sock)
-    with pytest.raises(RuntimeError) as e_info:
+    with pytest.raises(RuntimeError) as e_info:  # noqa
         osc.unbind(b'/failure', failure)
     osc.unbind(b'/failure', failure, sock)
 
@@ -165,7 +164,7 @@ def test_bind_no_default():
     def success(*values):
         pass
 
-    with pytest.raises(RuntimeError) as e_info:
+    with pytest.raises(RuntimeError) as e_info:  # noqa
         osc.bind(b'/success', success)
 
 
@@ -497,7 +496,7 @@ def test_answer():
 
     osc_2.send_message(b'/ping', [], *osc_1.getaddress())
 
-    with pytest.raises(RuntimeError) as e_info:
+    with pytest.raises(RuntimeError) as e_info:  # noqa
         osc_1.answer(b'/bing', [])
 
     timeout = time() + 2
@@ -521,5 +520,5 @@ def test_socket_family():
     if exists(filename):
         unlink(filename)
 
-    with pytest.raises(ValueError) as e_info:
+    with pytest.raises(ValueError) as e_info:  # noqa
         osc.listen(family='')
