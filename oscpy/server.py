@@ -12,6 +12,22 @@ from oscpy.parser import read_packet
 from oscpy.client import send_bundle, send_message
 
 
+def ServerClass(cls):
+    cls_init = cls.__init__
+
+    def __init__(self, *args, **kwargs):
+        cls_init(self, *args, **kwargs)
+
+        for m in dir(self):
+            meth = getattr(self, m)
+            if hasattr(meth, '_address'):
+                server, address, sock = meth._address
+                server.bind(address, meth, sock)
+
+    cls.__init__ = __init__
+    return cls
+
+
 class OSCThreadServer(object):
     '''Listen for osc messages in a thread, and dispatches the messages
     values to callbacks from there.
@@ -345,9 +361,36 @@ class OSCThreadServer(object):
         note:
             this won't work on methods as it'll call them as normal
             functions, and the callback won't get a `self` argument.
+
+            to bind a method use the `address_method decorator
         '''
         def decorator(callback):
             self.bind(address, callback, sock)
             return callback
+
+        return decorator
+
+    def address_method(self, address, sock=None):
+        '''Decorator allowing to bind a method from their definition
+
+        The class defining the method must itself be decorated with the
+        `ServerClass` decorator, the methods will be bound to the
+        address when the class is instantiated
+
+        example:
+
+            osc = OSCThreadServer()
+            osc.listen(default=True)
+
+            @ServerClass
+            class MyServer(object):
+
+                @osc.address_method(b'/test')
+                def success(*args):
+                    print("success!", args)
+        '''
+        def decorator(decorated):
+            decorated._address = (self, address, sock)
+            return decorated
 
         return decorator

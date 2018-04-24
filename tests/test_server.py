@@ -6,7 +6,7 @@ from tempfile import mktemp
 from os.path import exists
 from os import unlink
 
-from oscpy.server import OSCThreadServer
+from oscpy.server import OSCThreadServer, ServerClass
 from oscpy.client import send_message, send_bundle
 
 
@@ -156,6 +156,32 @@ def test_bind_address():
         sleep(10e-9)
 
     assert True in result
+
+
+def test_bind_address_class():
+    osc = OSCThreadServer()
+    osc.listen(default=True)
+
+    @ServerClass
+    class Test(object):
+        def __init__(self):
+            self.result = []
+
+        @osc.address_method(b'/test')
+        def success(self, *args):
+            self.result.append(True)
+
+    timeout = time() + 1
+
+    test = Test()
+    send_message(b'/test', [], *osc.getaddress())
+
+    while len(test.result) < 1:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
+
+    assert True in test.result
 
 
 def test_bind_no_default():
