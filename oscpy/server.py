@@ -33,7 +33,9 @@ class OSCThreadServer(object):
     values to callbacks from there.
     '''
 
-    def __init__(self, drop_late_bundles=False, timeout=0.01, advanced_matching=False):
+    def __init__(
+        self, drop_late_bundles=False, timeout=0.01, advanced_matching=False
+    ):
         '''
         - `timeout` is a number of seconds used as a time limit for
           select() calls in the listening thread, optiomal, defaults to
