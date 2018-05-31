@@ -105,11 +105,11 @@ Server (async) (TODO!)
 Client
 ```python
 
-    from oscpy import OSCClient
+    from oscpy.client import OSCClient
 
     osc = OSCClient(address, port)
     for i in range(10):
-        osc.send_message(b'/ping', i)
+        osc.send_message(b'/ping', [i])
 ```
 
 TODO:
