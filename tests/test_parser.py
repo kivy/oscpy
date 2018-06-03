@@ -76,6 +76,11 @@ def test_parse_blob():
     assert result == data
 
 
+def test_parse_unknown():
+    with raises(ValueError):
+        parse(b'H', struct.pack('>f', 1.5))
+
+
 def test_read_message():
     source, msg, result = message_1
     msg = struct.pack('>%iB' % len(msg), *msg)
@@ -89,6 +94,14 @@ def test_read_message():
     assert address == result[0]
     assert tags == b'iisff'
     assert values == result[1]
+
+
+def test_read_message_wrong_address():
+    msg = format_message(b'test', [])
+    with raises(ValueError) as e:
+        address, tags, values, size = read_message(msg)
+
+    assert "doesn't start with a '/'" in str(e)
 
 
 def test_read_bundle():
@@ -115,6 +128,14 @@ def test_read_bundle():
 def tests_format_message():
     for message in message_1, message_2:
         source, msg, result = message
+        msg = struct.pack('>%iB' % len(msg), *msg)
+        assert format_message(*source) == msg
+
+
+def tests_format_message_null_terminated_address():
+    for message in message_1, message_2:
+        source, msg, result = message
+        source = source[0] + b'\0', source[1]
         msg = struct.pack('>%iB' % len(msg), *msg)
         assert format_message(*source) == msg
 

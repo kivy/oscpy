@@ -22,6 +22,25 @@ def test_send_message():
         send_message(b'/success', [1], 'localhost', port)
 
 
+def test_send_message_safer():
+    osc = OSCThreadServer()
+    sock = osc.listen()
+    port = sock.getsockname()[1]
+    acc = []
+
+    def success(*values):
+        acc.append(values[0])
+
+    osc.bind(b'/success', success, sock)
+
+    timeout = time() + 5
+    while len(acc) < 100:
+        if time() > timeout:
+            raise OSError('timeout while waiting for  success message.')
+
+        send_message(b'/success', [1], 'localhost', port, safer=True)
+
+
 def test_send_bundle():
     osc = OSCThreadServer()
     sock = osc.listen()
@@ -44,6 +63,31 @@ def test_send_bundle():
                 for i in range(10)
             ],
             'localhost', port
+        )
+
+
+def test_send_bundle_safer():
+    osc = OSCThreadServer()
+    sock = osc.listen()
+    port = sock.getsockname()[1]
+    acc = []
+
+    def success(*values):
+        acc.append(values[0])
+
+    osc.bind(b'/success', success, sock)
+
+    timeout = time() + 5
+    while len(acc) < 100:
+        if time() > timeout:
+            raise OSError('timeout while waiting for  success message.')
+
+        send_bundle(
+            [
+                (b'/success', [i])
+                for i in range(10)
+            ],
+            'localhost', port, safer=True
         )
 
 
