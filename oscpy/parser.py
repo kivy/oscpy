@@ -1,3 +1,14 @@
+'''Parse and format data types, from and to packets that can be sent
+
+types are automatically infered using the `parsers` and `writters` members.
+
+Allowed types are:
+    int (but not *long* ints) -> osc int
+    floats -> osc float
+    bytes (encoded strings) -> osc strings
+    bytearray (raw data) -> osc blob
+
+'''
 from struct import Struct, pack, unpack_from, calcsize
 from time import time
 
@@ -61,12 +72,12 @@ writters = (
     (float, (b'f', b'f')),
     (int, (b'i', b'i')),
     (bytes, (b's', b'%is')),
-    (object, (b'b', b'%ib')),
+    (bytearray, (b'b', b'%ib')),
 )
 
 padsizes = {
     bytes: 4,
-    object: 8
+    bytearray: 8
 }
 
 
