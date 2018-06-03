@@ -20,6 +20,18 @@ def test_listen():
     osc.stop(sock)
 
 
+def test_getaddress():
+    osc = OSCThreadServer()
+    sock = osc.listen()
+    assert osc.getaddress(sock)[0] == '127.0.0.1'
+    with pytest.raises(RuntimeError):
+        osc.getaddress()
+
+    sock2 = osc.listen(default=True)
+    assert osc.getaddress(sock2)[0] == '127.0.0.1'
+    osc.stop(sock)
+
+
 def test_listen_default():
     osc = OSCThreadServer()
     sock = osc.listen(default=True)
@@ -47,6 +59,41 @@ def test_close():
         assert not exists(filename)
 
 
+def test_stop_unknown():
+    osc = OSCThreadServer()
+    with pytest.raises(RuntimeError):
+        osc.stop(socket.socket())
+
+
+def test_stop_all():
+    osc = OSCThreadServer()
+    osc.listen(default=True)
+    osc.listen()
+    assert len(osc.sockets) == 2
+    osc.stop_all()
+    assert len(osc.sockets) == 0
+
+
+def test_send_message_without_socket():
+    osc = OSCThreadServer()
+    with pytest.raises(RuntimeError):
+        osc.send_message(b'/test', [], 'localhost', 0)
+
+
+def test_send_bundle_without_socket():
+    osc = OSCThreadServer()
+    with pytest.raises(RuntimeError):
+        osc.send_bundle([], 'localhost', 0)
+
+    osc.listen(default=True)
+    osc.send_bundle(
+        (
+            (b'/test', []),
+        ),
+        'localhost', 1
+    )
+
+
 def test_bind():
     osc = OSCThreadServer()
     sock = osc.listen()
@@ -64,6 +111,22 @@ def test_bind():
     while not cont:
         if time() > timeout:
             raise OSError('timeout while waiting for success message.')
+
+
+def test_reuse_callback():
+    osc = OSCThreadServer()
+    sock = osc.listen()
+    port = sock.getsockname()[1]
+    cont = []
+
+    def success(*values):
+        cont.append(True)
+
+    osc.bind(b'/success', success, sock)
+    osc.bind(b'/success', success, sock)
+    osc.bind(b'/success2', success, sock)
+    assert len(osc.addresses.get((sock, b'/success'))) == 1
+    assert len(osc.addresses.get((sock, b'/success2'))) == 1
 
 
 def test_unbind():

@@ -224,6 +224,8 @@ class OSCThreadServer(object):
         if s in self.sockets:
             s.close()
             self.sockets.remove(s)
+        else:
+            raise RuntimeError('{} is not one of my sockets!'.format(s))
 
     def stop_all(self):
         '''call stop on all the existing sockets

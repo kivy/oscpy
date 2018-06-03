@@ -1,6 +1,6 @@
 from oscpy.parser import (
-    parse, padded, read_message, read_bundle, format_message,
-    format_bundle, timetag_to_time, time_to_timetag
+    parse, padded, read_message, read_bundle, read_packet,
+    format_message, format_bundle, timetag_to_time, time_to_timetag
 )
 from pytest import approx, raises
 from time import time
@@ -104,6 +104,13 @@ def test_read_message_wrong_address():
     assert "doesn't start with a '/'" in str(e)
 
 
+def test_read_broken_bundle():
+    s = b'not a bundle'
+    data = struct.pack('>%is' % len(s), s)
+    with raises(ValueError):
+        read_bundle(data)
+
+
 def test_read_bundle():
     pad = padded(len('#bundle'))
     data = struct.pack('>%isQ' % pad, b'#bundle', 1)
@@ -123,6 +130,10 @@ def test_read_bundle():
     timetag, messages = read_bundle(data)
     for test, r in zip(tests, messages):
         assert (r[0], r[2]) == test[2]
+
+def test_read_packet():
+    with raises(ValueError):
+        read_packet(struct.pack('>%is' % len('test'), b'test'))
 
 
 def tests_format_message():
@@ -162,3 +173,5 @@ def test_format_bundle():
 def test_timetag():
     assert time_to_timetag(None) == (0, 1)
     assert time_to_timetag(0)[1] == 0
+    assert time_to_timetag(30155831.26845886) == (2239144631, 1153022032)
+    assert timetag_to_time(time_to_timetag(30155831.26845886)) == approx(30155831.26845886)  # noqa
