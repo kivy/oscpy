@@ -50,11 +50,12 @@ parsers = {
     b'f': parse_float,
     b's': parse_string,
     b'b': parse_blob,
-    ord('i'): parse_int,
-    ord('f'): parse_float,
-    ord('s'): parse_string,
-    ord('b'): parse_blob,
 }
+
+parsers.update({
+    ord(k): v
+    for k, v in parsers.items()
+})
 
 writters = (
     (float, (b'f', b'f')),
