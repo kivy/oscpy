@@ -2,7 +2,7 @@ from oscpy.parser import (
     parse, padded, read_message, read_bundle, format_message,
     format_bundle, timetag_to_time, time_to_timetag
 )
-from pytest import approx
+from pytest import approx, raises
 from time import time
 import struct
 
@@ -40,6 +40,7 @@ message_2 = (
     ],
     (b'/foo', [1000, -1, b'hello', approx(1.234), approx(5.678)]),
 )
+
 
 def test_parse_int():
     assert parse(b'i', struct.pack('>i', 1))[0] == 1
@@ -116,6 +117,11 @@ def tests_format_message():
         source, msg, result = message
         msg = struct.pack('>%iB' % len(msg), *msg)
         assert format_message(*source) == msg
+
+
+def test_format_wrong_types():
+    with raises(TypeError):
+        format_message(b'/test', values=[u'test'])
 
 
 def test_format_bundle():

@@ -106,6 +106,11 @@ def format_message(address, values):
                 tags.append(tag)
                 fmt.append(f)
                 break
+        else:
+            raise TypeError(
+                'unable to find a writter for value {}, type not in: {}.'
+                .format(v, [x[0] for x in writters])
+            )
 
     fmt = b''.join(fmt)
     tags = b''.join(tags + [b'\0'])
