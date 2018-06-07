@@ -1,7 +1,7 @@
 language: python
 
 install:
-  - pip install --user .[dev]
+  - pip install .[dev]
 
 script:
   - pytest
