@@ -12,4 +12,4 @@ install:
 
 script:
   - pytest tests/ --cov oscpy/ --cov-branch
-  - COVERALLS_PARALLEL=true travis_retry coveralls
+  - travis_retry coveralls
