@@ -1,0 +1,8 @@
+language: python
+
+install:
+  - pip install --user .[dev]
+
+script:
+  - pytest
+
