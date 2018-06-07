@@ -1,5 +1,8 @@
 ### OSCPy
 
+[![Coverage Status](https://coveralls.io/repos/github/tshirtman/oscpy/badge.svg)](https://coveralls.io/github/tshirtman/oscpy)
+[![Build Status](https://travis-ci.org/tshirtman/oscpy.svg?branch=master)](https://travis-ci.org/tshirtman/oscpy)
+
 A modern implementation of OSC for python2/3.
 
 #### Goals:
