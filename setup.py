@@ -39,7 +39,7 @@ setup(
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
     install_requires=[],
     extras_require={
-        'dev': ['pytest', 'wheel'],
+        'dev': ['pytest', 'wheel', 'pytest-cov'],
         'travis': ['coveralls'],
     },
     package_data={},
