@@ -5,7 +5,7 @@ python:
   - "3.6"
   - "3.7-dev"  # 3.7 development branch
   # - "pypy2.7"
-  # - "pypy3.5"
+  - "pypy3.5"
 
 install:
   - pip install .[dev,travis]

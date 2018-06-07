@@ -156,7 +156,8 @@ def test_timetag():
                 (b'/failure', [i])
                 for i in range(10)
             ],
-            timetag=time() - 1
+            timetag=time() - 1,
+            safer=True,
         )
 
         client.send_bundle(
@@ -164,7 +165,8 @@ def test_timetag():
                 (b'/success', [i])
                 for i in range(10)
             ],
-            timetag=time()
+            timetag=time(),
+            safer=True,
         )
 
     assert True in acc
