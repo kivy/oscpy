@@ -165,7 +165,7 @@ def test_timetag():
                 (b'/success', [i])
                 for i in range(10)
             ],
-            timetag=time(),
+            timetag=time() + .1,
             safer=True,
         )
 
