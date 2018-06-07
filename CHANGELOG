@@ -1,0 +1,36 @@
+v0.3.0
+======
+
+increase test coverage
+remove notice about WIP status
+add test/fix for refusing to send unicode strings
+use bytearray for blobs, since object catch wrong types
+fix client code example in readme
+allow binding methods with the @address_method decorator
+add test for @address decorator
+clarify that @address decorator won't work for methods
+add test and warnings about AF_UNIX not working on windows
+fix negative letter matching
+check exception is raised when no default socket
+add test and implementation for advanced_matching
+
+
+v0.2.0
+======
+
+ignore build and dist dirs
+fix inet/unix comparison in performance test
+cleanup & documentation & performance test
+first minor version
+
+
+v0.1.3, v0.1.2, v0.1.1
+======================
+fix setup.py classifiers
+
+
+v0.1.0 Initial release
+======================
+
+OSCThreadServer implementation and basic tests
+OSCClient implementation
