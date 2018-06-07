@@ -11,5 +11,5 @@ install:
   - pip install .[dev,travis]
 
 script:
-  - pytest --cov oscpy/ --cov-branch
+  - pytest tests/ --cov oscpy/ --cov-branch
   - COVERALLS_PARALLEL=true travis_retry coveralls
