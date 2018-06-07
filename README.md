@@ -1,9 +1,9 @@
-OSCPy
-=====
+### OSCPy
 
 A modern implementation of OSC for python2/3.
 
-Goals:
+#### Goals:
+
 - python2.7/3.6+ compatibility (can be relaxed more on the python3 side if needed, but nothing before 2.7 will be supported)
 - fast
 - easy to use
@@ -12,16 +12,17 @@ Goals:
 - sync and async compatibility (threads, asyncio, trio…)
 - clean and easy to read code
 
-features:
+#### features:
+
 - serialize and parse OSC data types/Messages/Bundles
 - a thread based udp server to open sockets and bind callbacks on osc addresses on them
 - a simple client
 
 
-usage:
-------
+#### usage:
 
 Server (thread)
+
 ```python
     from oscpy.server import OSCThreadServer as OSC
     from time import sleep
@@ -39,6 +40,7 @@ Server (thread)
 or you can use the decorator API.
 
 Server (thread)
+
 ```python
     from oscpy.server import OSCThreadServer as OSC
     from time import sleep
@@ -56,6 +58,7 @@ Server (thread)
 
 Servers are also client, in the sense they can send messages and answer to
 messages from other servers
+
 ```python
     from oscpy.server import OSCThreadServer as OSC
     from time import sleep
@@ -89,6 +92,7 @@ messages from other servers
 
 
 Server (async) (TODO!)
+
 ```python
     from oscpy.server import OSCThreadServer as OSC
 
@@ -101,6 +105,7 @@ Server (async) (TODO!)
 ```
 
 Client
+
 ```python
 
     from oscpy.client import OSCClient
@@ -110,15 +115,13 @@ Client
         osc.send_message(b'/ping', [i])
 ```
 
-TODO:
-- [x] address matching (outside of the currently supported *exact* matching)
+#### TODO:
+
 - real support for timetag (currently only supports optionally dropping late bundles, not delaying those with timetags in the future)
 - support for additional arguments types
 - an asyncio-oriented server implementation
-- [x] performances assessment (profiling and comparison with other implementations)
 - examples & documentation
 
-license
--------
+#### license
 
 MIT
