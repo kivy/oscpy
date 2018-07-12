@@ -7,7 +7,8 @@ SOCK = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 
 def send_message(
-    osc_address, values, ip_address, port, sock=SOCK, safer=False
+    osc_address, values, ip_address, port, sock=SOCK, safer=False,
+    encoding=''
 ):
     '''send an osc message to a a socket address.
     - osc address is the osc endpoint to send the data to (e.g b'/test')
@@ -22,6 +23,10 @@ def send_message(
     - the safer parameter allows to wait a little after sending, to make
       sure the message is actually sent before doing anything else,
       should only be useful in tight loop or cpu-busy code.
+    - `encoding` if defined, will be used to encode/decode all
+      strings sent/received to/from unicode/string objects, if left
+      empty, the interface will only accept bytes and return bytes
+      to callback functions.
 
 
     examples:
@@ -41,13 +46,17 @@ def send_message(
         address = ip_address
     else:
         address = (ip_address, port)
-    sock.sendto(format_message(osc_address, values), address)
+    sock.sendto(
+        format_message(osc_address, values, encoding=encoding),
+        address
+    )
     if safer:
         sleep(10e-9)
 
 
 def send_bundle(
-    messages, ip_address, port, timetag=None, sock=None, safer=False
+    messages, ip_address, port, timetag=None, sock=None, safer=False,
+    encoding=''
 ):
     '''send a bundle built from the `messages` iterable.
     each item in the `messages` list should be a two-tuple of the form:
@@ -69,7 +78,7 @@ def send_bundle(
     if not sock:
         sock = SOCK
     sock.sendto(
-        format_bundle(messages, timetag=timetag),
+        format_bundle(messages, timetag=timetag, encoding=encoding),
         (ip_address, port),
     )
     if safer:
@@ -79,20 +88,23 @@ def send_bundle(
 class OSCClient(object):
     '''Class wrapper for the send_message and send_bundle functions,
     allowing to define address, port and sock parameters for all
-    calls.
+    calls. If encoding is provided, all string values will be encoded
+    into this encoding before being sent.
     '''
-    def __init__(self, address, port, sock=None):
+    def __init__(self, address, port, sock=None, encoding=''):
         self.address = address
         self.port = port
         self.sock = sock or SOCK
+        self.encoding = encoding
 
     def send_message(self, address, values, safer=False):
         send_message(
-            address, values, self.address, self.port, self.sock, safer=safer
+            address, values, self.address, self.port, self.sock,
+            safer=safer, encoding=self.encoding
         )
 
     def send_bundle(self, messages, timetag=None, safer=False):
         send_bundle(
             messages, self.address, self.port, timetag=timetag,
-            sock=self.sock, safer=safer
+            sock=self.sock, safer=safer, encoding=self.encoding
         )

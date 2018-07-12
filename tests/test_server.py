@@ -1,3 +1,4 @@
+# coding: utf8
 import pytest
 from time import time, sleep
 from sys import platform
@@ -611,3 +612,78 @@ def test_socket_family():
 
     with pytest.raises(ValueError) as e_info:  # noqa
         osc.listen(family='')
+
+
+def test_encoding_send():
+    osc = OSCThreadServer()
+    osc.listen(default=True)
+
+    values = []
+
+    @osc.address(b'/encoded')
+    def encoded(*val):
+        for v in val:
+            assert isinstance(v, bytes)
+        values.append(val)
+
+    send_message(
+        u'/encoded',
+        ['hello world', u'ééééé ààààà'],
+        *osc.getaddress(), encoding='utf8')
+
+    timeout = time() + 2
+    while not values:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
+
+
+def test_encoding_receive():
+    osc = OSCThreadServer(encoding='utf8')
+    osc.listen(default=True)
+
+    values = []
+
+    @osc.address(u'/encoded')
+    def encoded(*val):
+        for v in val:
+            assert not isinstance(v, bytes)
+        values.append(val)
+
+    send_message(
+        b'/encoded',
+        [
+            b'hello world',
+            u'ééééé ààààà'.encode('utf8')
+        ],
+        *osc.getaddress())
+
+    timeout = time() + 2
+    while not values:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
+
+
+def test_encoding_send_receive():
+    osc = OSCThreadServer(encoding='utf8')
+    osc.listen(default=True)
+
+    values = []
+
+    @osc.address(u'/encoded')
+    def encoded(*val):
+        for v in val:
+            assert not isinstance(v, bytes)
+        values.append(val)
+
+    send_message(
+        u'/encoded',
+        ['hello world', u'ééééé ààààà'],
+        *osc.getaddress(), encoding='utf8')
+
+    timeout = time() + 2
+    while not values:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
