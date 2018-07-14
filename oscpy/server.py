@@ -35,7 +35,7 @@ class OSCThreadServer(object):
 
     def __init__(
         self, drop_late_bundles=False, timeout=0.01, advanced_matching=False,
-        encoding=''
+        encoding='', encoding_errors='strict'
     ):
         '''
         - `timeout` is a number of seconds used as a time limit for
@@ -52,6 +52,8 @@ class OSCThreadServer(object):
           strings sent/received to/from unicode/string objects, if left
           empty, the interface will only accept bytes and return bytes
           to callback functions.
+        - `encoding_errors` if `encoding` is set, this value will be
+          used as `errors` parameter in encode/decode calls.
         '''
         self.addresses = {}
         self.sockets = []
@@ -60,6 +62,7 @@ class OSCThreadServer(object):
         self.drop_late_bundles = drop_late_bundles
         self.advanced_matching = advanced_matching
         self.encoding = encoding
+        self.encoding_errors = encoding_errors
         t = Thread(target=self._listen)
         t.daemon = True
         t.start()
@@ -81,7 +84,8 @@ class OSCThreadServer(object):
             raise RuntimeError('no default socket yet and no socket provided')
 
         if isinstance(address, UNICODE) and self.encoding:
-            address = address.encode(self.encoding)
+            address = address.encode(
+                self.encoding, errors=self.encoding_errors)
 
         if self.advanced_matching:
             address = self.create_smart_address(address)
@@ -265,7 +269,8 @@ class OSCThreadServer(object):
             for sender_socket in read:
                 data, sender = sender_socket.recvfrom(65535)
                 for address, types, values, offset in read_packet(
-                    data, drop_late=drop_late, encoding=self.encoding
+                    data, drop_late=drop_late, encoding=self.encoding,
+                    encoding_errors=self.encoding_errors
                 ):
                     if advanced_matching:
                         for sock, addr in addresses:

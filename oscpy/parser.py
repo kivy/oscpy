@@ -41,7 +41,7 @@ def parse_float(value, offset=0, **kwargs):
     return Float.unpack_from(value, offset)[0], Float.size
 
 
-def parse_string(value, offset=0, encoding=''):
+def parse_string(value, offset=0, encoding='', encoding_errors='strict'):
     result = []
     n = 0
     while True:
@@ -54,7 +54,7 @@ def parse_string(value, offset=0, encoding=''):
 
     r = b''.join(result)
     if encoding:
-        return r.decode(encoding), padded(n)
+        return r.decode(encoding, errors=encoding_errors), padded(n)
     else:
         return r, padded(n)
 
@@ -91,7 +91,7 @@ padsizes = {
 }
 
 
-def parse(hint, value, offset=0, encoding=''):
+def parse(hint, value, offset=0, encoding='', encoding_errors='strict'):
     parser = parsers.get(hint)
 
     if not parser:
@@ -99,10 +99,13 @@ def parse(hint, value, offset=0, encoding=''):
             "no known parser for type hint: {}, value: {}".format(hint, value)
         )
 
-    return parser(value, offset=offset, encoding=encoding)
+    return parser(
+        value, offset=offset, encoding=encoding,
+        encoding_errors=encoding_errors
+    )
 
 
-def format_message(address, values, encoding=''):
+def format_message(address, values, encoding='', encoding_errors='strict'):
     tags = [b',']
     fmt = []
     if encoding:
@@ -110,7 +113,7 @@ def format_message(address, values, encoding=''):
 
     for i, v in enumerate(values):
         if encoding and isinstance(v, UNICODE):
-            v = v.encode(encoding)
+            v = v.encode(encoding, errors=encoding_errors)
             values[i] = v
 
         for cls, writter in writters:
@@ -125,7 +128,7 @@ def format_message(address, values, encoding=''):
                 break
         else:
             raise TypeError(
-                'unable to find a writter for value {}, type not in: {}.'
+                u'unable to find a writter for value {}, type not in: {}.'
                 .format(v, [x[0] for x in writters])
             )
 
@@ -133,7 +136,7 @@ def format_message(address, values, encoding=''):
     tags = b''.join(tags + [b'\0'])
 
     if encoding and isinstance(address, UNICODE):
-        address = address.encode(encoding)
+        address = address.encode(encoding, errors=encoding_errors)
 
     if not address.endswith(b'\0'):
         address += b'\0'
@@ -142,7 +145,7 @@ def format_message(address, values, encoding=''):
     return pack(fmt, address, tags, *values)
 
 
-def read_message(data, offset=0, encoding=''):
+def read_message(data, offset=0, encoding='', encoding_errors='strict'):
     address, size = parse_string(data, offset=offset)
     n = size
     if not address.startswith(b'/'):
@@ -157,7 +160,10 @@ def read_message(data, offset=0, encoding=''):
 
     values = []
     for tag in tags:
-        v, off = parse(tag, data, offset=offset + n, encoding=encoding)
+        v, off = parse(
+            tag, data, offset=offset + n, encoding=encoding,
+            encoding_errors=encoding_errors
+        )
         values.append(v)
         n += off
 
@@ -182,20 +188,23 @@ def timetag_to_time(timetag):
     return seconds + fract / 2. ** 32 - NTP_DELTA
 
 
-def format_bundle(data, timetag=None, encoding=''):
+def format_bundle(data, timetag=None, encoding='', encoding_errors='strict'):
     timetag = time_to_timetag(timetag)
     bundle = [pack('8s', b'#bundle\0')]
     bundle.append(TimeTag.pack(*timetag))
 
     for address, values in data:
-        msg = format_message(address, values, encoding='')
+        msg = format_message(
+            address, values, encoding='',
+            encoding_errors=encoding_errors
+        )
         bundle.append(pack('>i', len(msg)))
         bundle.append(msg)
 
     return b''.join(bundle)
 
 
-def read_bundle(data, encoding=''):
+def read_bundle(data, encoding='', encoding_errors='strict'):
     length = len(data)
 
     header = unpack_from('7s', data, 0)[0]
@@ -214,7 +223,7 @@ def read_bundle(data, encoding=''):
         # size = Int.unpack_from(data, offset)
         offset += Int.size
         address, tags, values, off = read_message(
-            data, offset, encoding=encoding
+            data, offset, encoding=encoding, encoding_errors=encoding_errors
         )
         offset += off
         messages.append((address, tags, values, offset))
@@ -222,13 +231,20 @@ def read_bundle(data, encoding=''):
     return (timetag, messages)
 
 
-def read_packet(data, drop_late=False, encoding=''):
+def read_packet(data, drop_late=False, encoding='', encoding_errors='strict'):
     d = unpack_from('>c', data, 0)[0]
     if d == b'/':
-        return [read_message(data, encoding=encoding)]
+        return [
+            read_message(
+                data, encoding=encoding,
+                encoding_errors=encoding_errors
+            )
+        ]
 
     elif d == b'#':
-        timetag, messages = read_bundle(data, encoding=encoding)
+        timetag, messages = read_bundle(
+            data, encoding=encoding, encoding_errors=encoding_errors
+        )
         if drop_late:
             if time() > timetag:
                 return []
