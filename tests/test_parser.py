@@ -1,3 +1,5 @@
+# coding: utf8
+
 from oscpy.parser import (
     parse, padded, read_message, read_bundle, read_packet,
     format_message, format_bundle, timetag_to_time, time_to_timetag
@@ -66,6 +68,42 @@ def test_parse_string():
     )[0] == s
 
 
+def test_parse_string_encoded():
+    assert parse(
+        b's', struct.pack('%is' % padded(len('t')), u'é'.encode('utf8')),
+        encoding='utf8'
+    )[0] == u'é'
+
+    s = u'aééééààààa'
+    s_ = s.encode('utf8')
+    assert parse(
+        b's',
+        struct.pack('%is' % padded(len(s_) + 1), s_ + b'\0'),
+        encoding='utf8'
+    )[0] == s
+
+    with raises(UnicodeDecodeError):
+        parse(
+            b's',
+            struct.pack('%is' % padded(len(s_) + 1), s_ + b'\0'),
+            encoding='ascii'
+        )[0] == s
+
+    assert parse(
+        b's',
+        struct.pack('%is' % padded(len(s_) + 1), s_ + b'\0'),
+        encoding='ascii',
+        encoding_errors='replace'
+    )[0] == u'a����������������a'
+
+    assert parse(
+        b's',
+        struct.pack('%is' % padded(len(s_) + 1), s_ + b'\0'),
+        encoding='ascii',
+        encoding_errors='ignore'
+    )[0] == 'aa'
+
+
 def test_parse_blob():
     length = 10
     data = tuple(range(length))
@@ -131,6 +169,7 @@ def test_read_bundle():
     for test, r in zip(tests, messages):
         assert (r[0], r[2]) == test[2]
 
+
 def test_read_packet():
     with raises(ValueError):
         read_packet(struct.pack('>%is' % len('test'), b'test'))
@@ -175,3 +214,28 @@ def test_timetag():
     assert time_to_timetag(0)[1] == 0
     assert time_to_timetag(30155831.26845886) == (2239144631, 1153022032)
     assert timetag_to_time(time_to_timetag(30155831.26845886)) == approx(30155831.26845886)  # noqa
+
+
+def test_format_encoding():
+    s = u'éééààà'
+    with raises(TypeError):
+        read_message(format_message('/test', [s]))
+
+    assert read_message(format_message('/test', [s], encoding='utf8'))[2][0] == s.encode('utf8')  # noqa
+    assert read_message(format_message('/test', [s], encoding='utf8'), encoding='utf8')[2][0] == s  # noqa
+
+    with raises(UnicodeEncodeError):
+        format_message('/test', [s], encoding='ascii')  # noqa
+
+    with raises(UnicodeDecodeError):
+        read_message(format_message('/test', [s], encoding='utf8'), encoding='ascii')  # noqa
+
+    assert read_message(
+        format_message('/test', [s], encoding='utf8'),
+        encoding='ascii', encoding_errors='ignore'
+    )[2][0] == ''
+
+    assert read_message(
+        format_message('/test', [s], encoding='utf8'),
+        encoding='ascii', encoding_errors='replace'
+    )[2][0] == u'������������'

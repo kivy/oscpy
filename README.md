@@ -118,6 +118,34 @@ Client
         osc.send_message(b'/ping', [i])
 ```
 
+#### Unicode:
+
+By default, the server/client take bytes (encoded strings), not unicode
+strings, for osc addresses as well as osc strings. However, you can pass an
+`encoding` parameter to have your strings automatically encoded and decoded by
+them, so your callbacks will get unicode strings (unicode in python2, str in
+python3).
+
+```python
+    osc = OSCThreadServer(encoding='utf8')
+    osc.listen(default=True)
+
+    values = []
+
+    @osc.address(u'/encoded')
+    def encoded(*val):
+        for v in val:
+            assert not isinstance(v, bytes)
+        values.append(val)
+
+    send_message(
+        u'/encoded',
+        [u'hello world', u'ééééé ààààà'],
+        *osc.getaddress(), encoding='utf8')
+```
+
+(`u` litterals added here for clarity).
+
 #### TODO:
 
 - real support for timetag (currently only supports optionally dropping late bundles, not delaying those with timetags in the future)

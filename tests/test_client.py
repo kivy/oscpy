@@ -1,6 +1,10 @@
+# coding: utf8
+
 from oscpy.client import send_message, send_bundle, OSCClient
 from oscpy.server import OSCThreadServer
 from time import time, sleep
+
+import pytest
 
 
 def test_send_message():
@@ -171,3 +175,33 @@ def test_timetag():
 
     assert True in acc
     assert False not in acc
+
+
+def test_encoding_errors_strict():
+    with pytest.raises(UnicodeEncodeError) as e_info:  # noqa
+        send_message(
+            u'/encoded',
+            [u'ééééé ààààà'],
+            '', 9000,
+            encoding='ascii',
+        )
+
+
+def test_encoding_errors_ignore():
+    send_message(
+        u'/encoded',
+        [u'ééééé ààààà'],
+        '0.0.0.0', 9000,
+        encoding='ascii',
+        encoding_errors='ignore'
+    )
+
+
+def test_encoding_errors_replace():
+    send_message(
+        u'/encoded',
+        [u'ééééé ààààà'],
+        '0.0.0.0', 9000,
+        encoding='ascii',
+        encoding_errors='replace'
+    )
