@@ -27,7 +27,7 @@ A modern implementation of OSC for python2/3.
 Server (thread)
 
 ```python
-    from oscpy.server import OSCThreadServer as OSC
+    from oscpy.server import OSCThreadServer
     from time import sleep
 
     def callback(values):
@@ -45,7 +45,7 @@ or you can use the decorator API.
 Server (thread)
 
 ```python
-    from oscpy.server import OSCThreadServer as OSC
+    from oscpy.server import OSCThreadServer
     from time import sleep
 
     osc = OSCThreadServer()
@@ -63,7 +63,7 @@ Servers are also client, in the sense they can send messages and answer to
 messages from other servers
 
 ```python
-    from oscpy.server import OSCThreadServer as OSC
+    from oscpy.server import OSCThreadServer
     from time import sleep
 
     osc_1 = OSCThreadServer()
@@ -97,7 +97,7 @@ messages from other servers
 Server (async) (TODO!)
 
 ```python
-    from oscpy.server import OSCThreadServer as OSC
+    from oscpy.server import OSCThreadServer
 
     with OSCAsyncServer(port=8000) as OSC:
         for address, values in OSC.listen():
