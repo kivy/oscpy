@@ -261,8 +261,6 @@ class OSCThreadServer(object):
             if not self.sockets:
                 sleep(.01)
                 continue
-            elif len(self.sockets) < 2:
-                read = self.sockets
             else:
                 read, write, error = select(self.sockets, [], [], self.timeout)
 
