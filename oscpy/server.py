@@ -353,8 +353,8 @@ class OSCThreadServer(object):
         send_bundle(messages, ip_address, port, sock=sock, safer=safer)
 
     def answer(
-        self, address=None, values=None, bundle=None, timetag=None, safer=False,
-            port=None
+        self, address=None, values=None, bundle=None, timetag=None,
+        safer=False, port=None
     ):
         """Answers a message or bundle to a client.
 
@@ -379,7 +379,7 @@ class OSCThreadServer(object):
             raise RuntimeError('answer() not called from a callback')
 
         ip_address, response_port = frame.f_locals.get('sender')
-        if port != None:
+        if port is not None:
             response_port = port
         sock = frame.f_locals.get('sender_socket')
 
@@ -389,7 +389,9 @@ class OSCThreadServer(object):
                 safer=safer
             )
         else:
-            self.send_message(address, values, ip_address, response_port, sock=sock)
+            self.send_message(
+                address, values, ip_address, response_port, sock=sock
+            )
 
     def address(self, address, sock=None):
         """Decorate functions to bind them from their definition.
