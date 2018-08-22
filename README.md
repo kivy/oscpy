@@ -153,6 +153,12 @@ python3).
 - an asyncio-oriented server implementation
 - examples & documentation
 
+#### contributing
+
+Please see CONTRIBUTING.md
+
 #### license
 
 MIT
+
+Please see LICENSE.txt for full version.
