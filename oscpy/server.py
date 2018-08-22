@@ -261,8 +261,6 @@ class OSCThreadServer(object):
             if not self.sockets:
                 sleep(.01)
                 continue
-            elif len(self.sockets) < 2:
-                read = self.sockets
             else:
                 read, write, error = select(self.sockets, [], [], self.timeout)
 
@@ -327,7 +325,8 @@ class OSCThreadServer(object):
         send_bundle(messages, ip_address, port, sock=sock, safer=safer)
 
     def answer(
-        self, address=None, values=None, bundle=None, timetag=None, safer=False
+        self, address=None, values=None, bundle=None, timetag=None, safer=False,
+            port=None
     ):
         '''Answers a message or bundle to a client
         this method can only be called from a callback, it will lookup
@@ -350,16 +349,18 @@ class OSCThreadServer(object):
         else:
             raise RuntimeError('answer() not called from a callback')
 
-        ip_address, port = frame.f_locals.get('sender')
+        ip_address, response_port = frame.f_locals.get('sender')
+        if port != None:
+            response_port = port
         sock = frame.f_locals.get('sender_socket')
 
         if bundle:
             self.send_bundle(
-                bundle, ip_address, port, timetag=timetag, sock=sock,
+                bundle, ip_address, response_port, timetag=timetag, sock=sock,
                 safer=safer
             )
         else:
-            self.send_message(address, values, ip_address, port, sock=sock)
+            self.send_message(address, values, ip_address, response_port, sock=sock)
 
     def address(self, address, sock=None):
         '''Decorator method to allow binding functions from their definition
