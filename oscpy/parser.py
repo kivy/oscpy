@@ -1,6 +1,6 @@
 """Parse and format data types, from and to packets that can be sent.
 
-types are automatically inferred using the `parsers` and `writters` members.
+types are automatically inferred using the `parsers` and `writers` members.
 
 Allowed types are:
     int (but not *long* ints) -> osc int
@@ -91,12 +91,16 @@ parsers.update({
     for k, v in parsers.items()
 })
 
-writters = (
+writers = (
     (float, (b'f', b'f')),
     (int, (b'i', b'i')),
     (bytes, (b's', b'%is')),
     (bytearray, (b'b', b'%ib')),
 )
+
+# XXX in case someone imported writters from us, keep the misspelled
+# version around for some time
+writters = writers
 
 padsizes = {
     bytes: 4,
@@ -135,9 +139,9 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
             v = v.encode(encoding, errors=encoding_errors)
             values[i] = v
 
-        for cls, writter in writters:
+        for cls, writer in writers:
             if isinstance(v, cls):
-                tag, f = writter
+                tag, f = writer
                 if b'%i' in f:
                     v += b'\0'
                     f = f % padded(len(v), padsizes[cls])
@@ -147,8 +151,8 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
                 break
         else:
             raise TypeError(
-                u'unable to find a writter for value {}, type not in: {}.'
-                .format(v, [x[0] for x in writters])
+                u'unable to find a writer for value {}, type not in: {}.'
+                .format(v, [x[0] for x in writers])
             )
 
     fmt = b''.join(fmt)
