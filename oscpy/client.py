@@ -1,3 +1,12 @@
+"""Client API.
+
+This module provide both a functionnal and an object oriented API.
+
+You can use `send_message`/`send_bundle` and the default created `SOCK` socket
+directly, or use `OSCClient` to store parameters common to your requests
+and avoid repeating them in your code.
+"""
+
 import socket
 from oscpy.parser import format_message, format_bundle
 from time import sleep
@@ -10,7 +19,8 @@ def send_message(
     osc_address, values, ip_address, port, sock=SOCK, safer=False,
     encoding='', encoding_errors='strict'
 ):
-    '''send an osc message to a a socket address.
+    """Send an osc message to a a socket address.
+
     - osc address is the osc endpoint to send the data to (e.g b'/test')
       it should be a bytestring
     - values is the list of value to send, values can be any supported osc
@@ -42,7 +52,7 @@ def send_message(
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
         send_message(b'/some/address', [1, 2, 3], b'/tmp/sock')
 
-    '''
+    """
     if platform != 'win32' and sock.family == socket.AF_UNIX:
         address = ip_address
     else:
@@ -62,7 +72,8 @@ def send_bundle(
     messages, ip_address, port, timetag=None, sock=None, safer=False,
     encoding='', encoding_errors='strict'
 ):
-    '''send a bundle built from the `messages` iterable.
+    """Send a bundle built from the `messages` iterable.
+
     each item in the `messages` list should be a two-tuple of the form:
     (address, values).
 
@@ -78,7 +89,7 @@ def send_bundle(
     since 1970 when the events described in the bundle should happen.
 
     See `send_message` documentation for the other parameters.
-    '''
+    """
     if not sock:
         sock = SOCK
     sock.sendto(
@@ -93,14 +104,21 @@ def send_bundle(
 
 
 class OSCClient(object):
-    '''Class wrapper for the send_message and send_bundle functions,
-    allowing to define address, port and sock parameters for all
-    calls. If encoding is provided, all string values will be encoded
+    """Class wrapper for the send_message and send_bundle functions.
+
+    Allow to define address, port and sock parameters for all calls.
+    If encoding is provided, all string values will be encoded
     into this encoding before being sent.
-    '''
+    """
+
     def __init__(
         self, address, port, sock=None, encoding='', encoding_errors='strict'
     ):
+        """Create an OSCClient.
+
+        address and port are the destination of messages sent by this client.
+        see send_message and send_bundle documentation for more information.
+        """
         self.address = address
         self.port = port
         self.sock = sock or SOCK
@@ -108,6 +126,7 @@ class OSCClient(object):
         self.encoding_errors = encoding_errors
 
     def send_message(self, address, values, safer=False):
+        """Wrap the module level `send_message` function."""
         send_message(
             address, values, self.address, self.port, self.sock,
             safer=safer, encoding=self.encoding,
@@ -115,6 +134,7 @@ class OSCClient(object):
         )
 
     def send_bundle(self, messages, timetag=None, safer=False):
+        """Wrap the module level `send_bundle` function."""
         send_bundle(
             messages, self.address, self.port, timetag=timetag,
             sock=self.sock, safer=safer, encoding=self.encoding,

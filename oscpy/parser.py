@@ -1,4 +1,4 @@
-'''Parse and format data types, from and to packets that can be sent
+"""Parse and format data types, from and to packets that can be sent.
 
 types are automatically infered using the `parsers` and `writters` members.
 
@@ -8,7 +8,7 @@ Allowed types are:
     bytes (encoded strings) -> osc strings
     bytearray (raw data) -> osc blob
 
-'''
+"""
 from struct import Struct, pack, unpack_from, calcsize
 from time import time
 import sys
@@ -29,19 +29,31 @@ NTP_DELTA = 2208988800
 
 
 def padded(l, n=4):
+    """Return the size to pad a thing to.
+
+    - `l` being the current size of the thing.
+    - `n` being the desired divisor of the thing's padded size.
+    """
     m, r = divmod(l, n)
     return n * (min(1, r) + l // n)
 
 
 def parse_int(value, offset=0, **kwargs):
+    """Return an int from offset in value."""
     return Int.unpack_from(value, offset)[0], Int.size
 
 
 def parse_float(value, offset=0, **kwargs):
+    """Return a float from offset in value."""
     return Float.unpack_from(value, offset)[0], Float.size
 
 
 def parse_string(value, offset=0, encoding='', encoding_errors='strict'):
+    """Return a string from offset in value.
+
+    if encoding is defined, the string will be decoded. encoding_errors
+    will be used to manage encoding errors in decoding.
+    """
     result = []
     n = 0
     while True:
@@ -60,6 +72,7 @@ def parse_string(value, offset=0, encoding='', encoding_errors='strict'):
 
 
 def parse_blob(value, offset=0, **kwargs):
+    """Return a blob from offset in value."""
     size = calcsize('>i')
     length = unpack_from('>i', value, offset)[0]
     data = unpack_from('>%iQ' % length, value, offset + size)
@@ -92,6 +105,11 @@ padsizes = {
 
 
 def parse(hint, value, offset=0, encoding='', encoding_errors='strict'):
+    """Call the correct parser function for the provided hint.
+
+    hint will be used to determine the correct parser, other parameters
+    will be passed to this parser.
+    """
     parser = parsers.get(hint)
 
     if not parser:
@@ -106,6 +124,7 @@ def parse(hint, value, offset=0, encoding='', encoding_errors='strict'):
 
 
 def format_message(address, values, encoding='', encoding_errors='strict'):
+    """Create a message."""
     tags = [b',']
     fmt = []
     if encoding:
@@ -146,6 +165,11 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
 
 
 def read_message(data, offset=0, encoding='', encoding_errors='strict'):
+    """Return address, tags, values, and length of a decoded message.
+
+    Can be called either on a standalone message, or on a message
+    extracted from a bundle.
+    """
     address, size = parse_string(data, offset=offset)
     n = size
     if not address.startswith(b'/'):
@@ -170,10 +194,15 @@ def read_message(data, offset=0, encoding='', encoding_errors='strict'):
     return address, tags, values, n
 
 
-def time_to_timetag(timetag):
-    if timetag is None:
+def time_to_timetag(time):
+    """Create a timetag from a time.
+
+    time is an unix timestamp (number of seconds since 1/1/1970).
+    result is the equivalent time using the NTP format.
+    """
+    if time is None:
         return (0, 1)
-    seconds, fract = divmod(timetag, 1)
+    seconds, fract = divmod(time, 1)
     seconds += NTP_DELTA
     seconds = int(seconds)
     fract = int(fract * 2**32)
@@ -181,6 +210,11 @@ def time_to_timetag(timetag):
 
 
 def timetag_to_time(timetag):
+    """Decode a timetag to a time.
+
+    timetag is an NTP formated time.
+    retult is the equivalent unix timestamp (number of seconds since 1/1/1970).
+    """
     if timetag == (0, 1):
         return time()
 
@@ -189,6 +223,12 @@ def timetag_to_time(timetag):
 
 
 def format_bundle(data, timetag=None, encoding='', encoding_errors='strict'):
+    """Create a bundle from a list of (address, values) tuples.
+
+    string values will be encoded using `encoding` or must be provided
+    as bytes.
+    encoding_errors will be used to manage encoding errors.
+    """
     timetag = time_to_timetag(timetag)
     bundle = [pack('8s', b'#bundle\0')]
     bundle.append(TimeTag.pack(*timetag))
@@ -205,6 +245,7 @@ def format_bundle(data, timetag=None, encoding='', encoding_errors='strict'):
 
 
 def read_bundle(data, encoding='', encoding_errors='strict'):
+    """Decode a bundle into a (timestamp, messages) tuple."""
     length = len(data)
 
     header = unpack_from('7s', data, 0)[0]
@@ -232,6 +273,12 @@ def read_bundle(data, encoding='', encoding_errors='strict'):
 
 
 def read_packet(data, drop_late=False, encoding='', encoding_errors='strict'):
+    """Detect if the data received is a simple message or a bundle, read it.
+
+    Always return a list of messages.
+    If drop_late is true, and the received data is an expired bundle,
+    then returns an empty list.
+    """
     d = unpack_from('>c', data, 0)[0]
     if d == b'/':
         return [

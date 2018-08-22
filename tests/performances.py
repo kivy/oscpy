@@ -1,3 +1,4 @@
+"""A crude performance assesment of oscpy."""
 from oscpy.server import OSCThreadServer
 from oscpy.client import send_message
 from oscpy.parser import format_message, read_message
@@ -59,6 +60,7 @@ received = 0
 
 
 def count(*values):
+    """Count calls."""
     global received
     received += 1
 
