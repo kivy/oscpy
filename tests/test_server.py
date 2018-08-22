@@ -687,3 +687,6 @@ def test_encoding_send_receive():
         if time() > timeout:
             raise OSError('timeout while waiting for success message.')
         sleep(10e-9)
+
+if __name__ == "__main__":
+    test_answer()
