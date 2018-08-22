@@ -1,3 +1,5 @@
+"""See README.md for package documentation."""
+
 from setuptools import setup, find_packages
 
 from io import open
@@ -39,7 +41,7 @@ setup(
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
     install_requires=[],
     extras_require={
-        'dev': ['pytest', 'wheel', 'pytest-cov'],
+        'dev': ['pytest', 'wheel', 'pytest-cov', 'pycodestyle'],
         'travis': ['coveralls'],
     },
     package_data={},

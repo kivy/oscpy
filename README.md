@@ -5,24 +5,26 @@
 
 A modern implementation of OSC for python2/3.
 
-#### Goals:
+#### Goals
 
-- python2.7/3.6+ compatibility (can be relaxed more on the python3 side if needed, but nothing before 2.7 will be supported)
+- python2.7/3.6+ compatibility (can be relaxed more on the python3 side
+  if needed, but nothing before 2.7 will be supported)
 - fast
 - easy to use
-- robust (returns meaningful errors in case of malformed messages, always do the right thing on correct messages)
+- robust (returns meaningful errors in case of malformed messages,
+  always do the right thing on correct messages)
 - separation of concerns (message parsing vs communication)
 - sync and async compatibility (threads, asyncio, trio…)
 - clean and easy to read code
 
-#### features:
+#### Features
 
 - serialize and parse OSC data types/Messages/Bundles
 - a thread based udp server to open sockets and bind callbacks on osc addresses on them
 - a simple client
 
 
-#### usage:
+#### Usage
 
 Server (thread)
 
@@ -118,9 +120,9 @@ Client
         osc.send_message(b'/ping', [i])
 ```
 
-#### Unicode:
+#### Unicode
 
-By default, the server/client take bytes (encoded strings), not unicode
+By default, the server and client take bytes (encoded strings), not unicode
 strings, for osc addresses as well as osc strings. However, you can pass an
 `encoding` parameter to have your strings automatically encoded and decoded by
 them, so your callbacks will get unicode strings (unicode in python2, str in
@@ -144,15 +146,21 @@ python3).
         *osc.getaddress(), encoding='utf8')
 ```
 
-(`u` litterals added here for clarity).
+(`u` literals added here for clarity).
 
-#### TODO:
+#### TODO
 
-- real support for timetag (currently only supports optionally dropping late bundles, not delaying those with timetags in the future)
-- support for additional arguments types
+- real support for timetag (currently only supports optionally
+  dropping late bundles, not delaying those with timetags in the future)
+- support for additional argument types
 - an asyncio-oriented server implementation
 - examples & documentation
 
-#### license
+#### Contributing
 
-MIT
+Check out our [contribution guide](CONTRIBUTING.md) and feel free to improve OSCPy.
+
+#### License
+
+OSCPy is released under the terms of the MIT License.
+Please see the [LICENSE.txt](LICENSE.txt) file.

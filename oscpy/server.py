@@ -1,3 +1,8 @@
+"""Server API.
+
+This module currently only implements `OSCThreadServer`, a thread based server.
+"""
+
 from threading import Thread
 
 from select import select
@@ -13,6 +18,12 @@ from oscpy.client import send_bundle, send_message
 
 
 def ServerClass(cls):
+    """Decorate classes with for methods implementing OSC endpoints.
+
+    This decorator is necessary on your class if you want to use the
+    `address_method` decorator on its methods, see
+    `:meth:OSCThreadServer.address_method`'s documentation.
+    """
     cls_init = cls.__init__
 
     def __init__(self, *args, **kwargs):
@@ -29,15 +40,18 @@ def ServerClass(cls):
 
 
 class OSCThreadServer(object):
-    '''Listen for osc messages in a thread, and dispatches the messages
+    """A thread-based OSC server.
+
+    Listens for osc messages in a thread, and dispatches the messages
     values to callbacks from there.
-    '''
+    """
 
     def __init__(
         self, drop_late_bundles=False, timeout=0.01, advanced_matching=False,
         encoding='', encoding_errors='strict'
     ):
-        '''
+        """Create an OSCThreadServer.
+
         - `timeout` is a number of seconds used as a time limit for
           select() calls in the listening thread, optiomal, defaults to
           0.01.
@@ -45,7 +59,7 @@ class OSCThreadServer(object):
           from bundles that arrived after their timetag value.
           (optional, defaults to False)
         - `advanced_matching` (defaults to False), setting this to True
-          activate the pattern matching part of the specification, let
+          activates the pattern matching part of the specification, let
           this to False if you don't need it, as it triggers a lot more
           computation for each received message.
         - `encoding` if defined, will be used to encode/decode all
@@ -54,7 +68,7 @@ class OSCThreadServer(object):
           to callback functions.
         - `encoding_errors` if `encoding` is set, this value will be
           used as `errors` parameter in encode/decode calls.
-        '''
+        """
         self.addresses = {}
         self.sockets = []
         self.timeout = timeout
@@ -71,13 +85,15 @@ class OSCThreadServer(object):
         self._smart_part_cache = {}
 
     def bind(self, address, callback, sock=None):
-        '''Bind a callback to an osc address, a socket in the list of
-        existing sockets of the server can be given. If no socket is
-        provided, the default socket of the server is used, if no
-        default socket has been defined, a RuntimeError is raised.
+        """Bind a callback to an osc address.
 
-        multiple callbacks can be bound to the same address.
-        '''
+        A socket in the list of existing sockets of the server can be
+        given. If no socket is provided, the default socket of the
+        server is used, if no default socket has been defined, a
+        RuntimeError is raised.
+
+        Multiple callbacks can be bound to the same address.
+        """
         if not sock and self.default_socket:
             sock = self.default_socket
         elif not sock:
@@ -96,6 +112,11 @@ class OSCThreadServer(object):
         self.addresses[(sock, address)] = callbacks
 
     def create_smart_address(self, address):
+        """Create an advanced matching address from a string.
+
+        The address will be split by '/' and each part will be converted
+        into a regexp, using the rules defined in the OSC specification.
+        """
         cache = self._smart_address_cache
 
         if address in cache:
@@ -148,9 +169,10 @@ class OSCThreadServer(object):
             return smart_part
 
     def unbind(self, address, callback, sock=None):
-        '''Un bind a callback from an address.
+        """Unbind a callback from an OSC address.
+
         See `bind` for `sock` documentation.
-        '''
+        """
         if not sock and self.default_socket:
             sock = self.default_socket
         elif not sock:
@@ -161,20 +183,23 @@ class OSCThreadServer(object):
             callbacks.remove(callback)
         self.addresses[(sock, address)] = callbacks
 
-    def listen(self, address='localhost', port=0, default=False, family='inet'):
-        '''starts listening on an (address, port)
-        - if port is 0, the system will allocate a free port
-        - if default is True, the instance will save this socket as the
+    def listen(
+        self, address='localhost', port=0, default=False, family='inet'
+    ):
+        """Start listening on an (address, port).
+
+        - if `port` is 0, the system will allocate a free port
+        - if `default` is True, the instance will save this socket as the
           default one for subsequent calls to methods with an optional socket
-        - `family` accept the 'unix' and 'inet' values, a socket of the
+        - `family` accepts the 'unix' and 'inet' values, a socket of the
           corresponding type will be created.
           If family is 'unix', then the address must be a filename, the
-          'port' value won't be used. 'unix' sockets are not defined on
-          windows.
+          `port` value won't be used. 'unix' sockets are not defined on
+          Windows.
 
         The socket created to listen is returned, and can be used later
         with methods accepting the `sock` parameter.
-        '''
+        """
         if family == 'unix':
             family_ = socket.AF_UNIX
         elif family == 'inet':
@@ -202,8 +227,7 @@ class OSCThreadServer(object):
         return sock
 
     def close(self, sock=None):
-        '''close a socket opened by the server.
-        '''
+        """Close a socket opened by the server."""
         if not sock and self.default_socket:
             sock = self.default_socket
         elif not sock:
@@ -218,12 +242,13 @@ class OSCThreadServer(object):
             self.default_socket = None
 
     def getaddress(self, sock=None):
-        '''wraps call to getsockname, on the provided socket, or the
-        default socket for the server.
+        """Wrap call to getsockname.
 
-        returns (ip, port) for an inet socket, or filename for an unix
+        If `sock` is None, uses the default socket for the server.
+
+        Returns (ip, port) for an inet socket, or filename for an unix
         socket.
-        '''
+        """
         if not sock and self.default_socket:
             sock = self.default_socket
         elif not sock:
@@ -232,8 +257,7 @@ class OSCThreadServer(object):
         return sock.getsockname()
 
     def stop(self, s):
-        '''close and remove a socket from the server's sockets
-        '''
+        """Close and remove a socket from the server's sockets."""
         if s in self.sockets:
             s.close()
             self.sockets.remove(s)
@@ -241,17 +265,17 @@ class OSCThreadServer(object):
             raise RuntimeError('{} is not one of my sockets!'.format(s))
 
     def stop_all(self):
-        '''call stop on all the existing sockets
-        '''
+        """Call stop on all the existing sockets."""
         for s in self.sockets[:]:
             self.stop(s)
 
     def _listen(self):
-        '''(internal) this is method is called in a thread by the
-        `listen` method, and will be the one actually listening for
-        messages on the server's sockets, and calling the callbacks when
-        messages are received.
-        '''
+        """(internal) Busy loop to listen for events.
+
+        This method is called in a thread by the `listen` method, and
+        will be the one actually listening for messages on the server's
+        sockets, and calling the callbacks when messages are received.
+        """
         match = self._match_address
         advanced_matching = self.advanced_matching
         addresses = self.addresses
@@ -282,9 +306,11 @@ class OSCThreadServer(object):
 
     @staticmethod
     def _match_address(smart_address, target_address):
-        '''(internal) a smart_address is a list of regexps to match
-        against the parts of the target address
-        '''
+        """(internal) Check if provided `smart_address` matches address.
+
+        A `smart_address` is a list of regexps to match
+        against the parts of the `target_address`.
+        """
         target_parts = target_address.split(b'/')
         if len(target_parts) != len(smart_address):
             return False
@@ -298,10 +324,11 @@ class OSCThreadServer(object):
     def send_message(
         self, osc_address, values, ip_address, port, sock=None, safer=False
     ):
-        '''Shortcut to the client's send_message method, using the
-        default_socket of the server by default. see
-        `client.send_message` for more info about the parameters.
-        '''
+        """Shortcut to the client's `send_message` method.
+
+        Use the default_socket of the server by default.
+        See `client.send_message` for more info about the parameters.
+        """
         if not sock and self.default_socket:
             sock = self.default_socket
         elif not sock:
@@ -313,10 +340,11 @@ class OSCThreadServer(object):
     def send_bundle(
         self, messages, ip_address, port, timetag=None, sock=None, safer=False
     ):
-        '''Shortcut to the client's send_bundle method, using the
-        default_socket of the server by default. see
-        `client.send_bundle` for more info about the parameters.
-        '''
+        """Shortcut to the client's `send_bundle` method.
+
+        Use the `default_socket` of the server by default.
+        See `client.send_bundle` for more info about the parameters.
+        """
         if not sock and self.default_socket:
             sock = self.default_socket
         elif not sock:
@@ -325,21 +353,22 @@ class OSCThreadServer(object):
         send_bundle(messages, ip_address, port, sock=sock, safer=safer)
 
     def answer(
-        self, address=None, values=None, bundle=None, timetag=None, safer=False,
-            port=None
+        self, address=None, values=None, bundle=None, timetag=None,
+        safer=False, port=None
     ):
-        '''Answers a message or bundle to a client
-        this method can only be called from a callback, it will lookup
+        """Answers a message or bundle to a client.
+
+        This method can only be called from a callback, it will lookup
         the sender of the packet that triggered the callback, and send
         the given message or bundle to it.
 
         `timetag` is only used if `bundle` is True.
-        see `send_message` and `send_bundle` for info about the parameters.
+        See `send_message` and `send_bundle` for info about the parameters.
 
         Only one of `values` or `bundle` should be defined, if `values`
         is defined, `send_message` is used with it, if `bundle` is
         defined, `send_bundle` is used with its value.
-        '''
+        """
         if not values:
             values = []
         frames = inspect.getouterframes(inspect.currentframe())
@@ -350,7 +379,7 @@ class OSCThreadServer(object):
             raise RuntimeError('answer() not called from a callback')
 
         ip_address, response_port = frame.f_locals.get('sender')
-        if port != None:
+        if port is not None:
             response_port = port
         sock = frame.f_locals.get('sender_socket')
 
@@ -360,12 +389,14 @@ class OSCThreadServer(object):
                 safer=safer
             )
         else:
-            self.send_message(address, values, ip_address, response_port, sock=sock)
+            self.send_message(
+                address, values, ip_address, response_port, sock=sock
+            )
 
     def address(self, address, sock=None):
-        '''Decorator method to allow binding functions from their definition
+        """Decorate functions to bind them from their definition.
 
-        address is the osc address to bind to the callback
+        `address` is the osc address to bind to the callback.
 
         example:
             server = OSCThreadServer()
@@ -378,11 +409,11 @@ class OSCThreadServer(object):
             send_message(b'/printer', [b'hello world'])
 
         note:
-            this won't work on methods as it'll call them as normal
+            This won't work on methods as it'll call them as normal
             functions, and the callback won't get a `self` argument.
 
-            to bind a method use the `address_method decorator
-        '''
+            To bind a method use the `address_method` decorator.
+        """
         def decorator(callback):
             self.bind(address, callback, sock)
             return callback
@@ -390,11 +421,11 @@ class OSCThreadServer(object):
         return decorator
 
     def address_method(self, address, sock=None):
-        '''Decorator allowing to bind a method from their definition
+        """Decorate methods to bind them from their definition.
 
         The class defining the method must itself be decorated with the
         `ServerClass` decorator, the methods will be bound to the
-        address when the class is instantiated
+        address when the class is instantiated.
 
         example:
 
@@ -407,7 +438,7 @@ class OSCThreadServer(object):
                 @osc.address_method(b'/test')
                 def success(*args):
                     print("success!", args)
-        '''
+        """
         def decorator(decorated):
             decorated._address = (self, address, sock)
             return decorated
