@@ -98,7 +98,9 @@ class OSCClient(object):
     calls. If encoding is provided, all string values will be encoded
     into this encoding before being sent.
     '''
-    def __init__(self, address, port, sock=None, encoding='', encoding_errors='strict'):
+    def __init__(
+        self, address, port, sock=None, encoding='', encoding_errors='strict'
+    ):
         self.address = address
         self.port = port
         self.sock = sock or SOCK

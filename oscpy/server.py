@@ -161,7 +161,9 @@ class OSCThreadServer(object):
             callbacks.remove(callback)
         self.addresses[(sock, address)] = callbacks
 
-    def listen(self, address='localhost', port=0, default=False, family='inet'):
+    def listen(
+        self, address='localhost', port=0, default=False, family='inet'
+    ):
         '''starts listening on an (address, port)
         - if port is 0, the system will allocate a free port
         - if default is True, the instance will save this socket as the

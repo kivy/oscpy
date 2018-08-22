@@ -19,30 +19,36 @@ patterns = [
     list(range(500)),
 ]
 
-# print("#" * 80)
-# print("format/parse test")
+print("#" * 80)
+print("format/parse test")
 
-# for pattern in patterns:
-#     print("*" * 100)
-#     print(f"pattern: {pattern}")
-#     n = 0
-#     timeout = time() + DURATION
+for i, pattern in enumerate(patterns):
+    print("*" * 100)
+    print(f"pattern: {i}")
+    n = 0
+    timeout = time() + DURATION
 
-#     while time() < timeout:
-#         n += 1
-#         p = format_message(b'/address', [b'test', 1, 1.2345])
+    while time() < timeout:
+        n += 1
+        p = format_message(b'/address', [b'test', 1, 1.2345])
 
-#     size = len(p) / 1000
-#     print(f"formated message {n} times ({n / DURATION}/s) ({n * size / DURATION:.2f}MB/s)")
+    size = len(p) / 1000
+    print(
+        f"formated message {n} times ({n / DURATION}/s) "
+        f"({n * size / DURATION:.2f}MB/s)"
+    )
 
-#     n = 0
-#     timeout = time() + DURATION
+    n = 0
+    timeout = time() + DURATION
 
-#     while time() < timeout:
-#         n += 1
-#         read_message(p)
+    while time() < timeout:
+        n += 1
+        read_message(p)
 
-#     print(f"parsed message {n} times ({n / DURATION}/s) ({n * size / DURATION:.2f}MB/s)")
+    print(
+        f"parsed message {n} times ({n / DURATION}/s) "
+        f"({n * size / DURATION:.2f}MB/s)"
+    )
 
 
 print("#" * 80)
