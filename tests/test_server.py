@@ -773,3 +773,40 @@ def test_encoding_send_receive():
         if time() > timeout:
             raise OSError('timeout while waiting for success message.')
         sleep(10e-9)
+
+
+def test_default_handler():
+    results = []
+
+    def test(address, *values):
+        results.append((address, values))
+
+    osc = OSCThreadServer(default_handler=test)
+    osc.listen(default=True)
+
+    @osc.address(b'/passthrough')
+    def passthrough(*values):
+        pass
+
+    osc.send_bundle(
+        (
+            (b'/test', []),
+            (b'/passthrough', []),
+            (b'/test/2', [1, 2, 3]),
+        ),
+        *osc.getaddress()
+    )
+
+    timeout = time() + 2
+    while len(results) < 2:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
+
+    expected = (
+        (b'/test', tuple()),
+        (b'/test/2', (1, 2, 3)),
+    )
+
+    for e, r in zip(expected, results):
+        assert e == r
