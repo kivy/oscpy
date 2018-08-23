@@ -68,6 +68,9 @@ class OSCThreadServer(object):
           to callback functions.
         - `encoding_errors` if `encoding` is set, this value will be
           used as `errors` parameter in encode/decode calls.
+        - `default_handler` if defined, will be used to handle any
+          message that no configured address matched, the received
+          arguments will be (address, *values).
         """
         self.addresses = {}
         self.sockets = []
