@@ -48,7 +48,7 @@ class OSCThreadServer(object):
 
     def __init__(
         self, drop_late_bundles=False, timeout=0.01, advanced_matching=False,
-        encoding='', encoding_errors='strict'
+        encoding='', encoding_errors='strict', default_handler=None
     ):
         """Create an OSCThreadServer.
 
@@ -77,6 +77,7 @@ class OSCThreadServer(object):
         self.advanced_matching = advanced_matching
         self.encoding = encoding
         self.encoding_errors = encoding_errors
+        self.default_handler = default_handler
         t = Thread(target=self._listen)
         t.daemon = True
         t.start()
@@ -301,9 +302,11 @@ class OSCThreadServer(object):
                     data, drop_late=drop_late, encoding=self.encoding,
                     encoding_errors=self.encoding_errors
                 ):
+                    matched = False
                     if advanced_matching:
                         for sock, addr in addresses:
                             if sock == sender_socket and match(addr, address):
+                                matched = True
                                 for cb, get_address in addresses[(sock, addr)]:
                                     if get_address:
                                         cb(address, *values)
@@ -311,6 +314,9 @@ class OSCThreadServer(object):
                                         cb(*values)
 
                     else:
+                        if (sender_socket, address) in addresses:
+                            matched = True
+
                         for cb, get_address in addresses.get(
                             (sender_socket, address), []
                         ):
@@ -318,6 +324,9 @@ class OSCThreadServer(object):
                                 cb(address, *values)
                             else:
                                 cb(*values)
+
+                    if not matched and self.default_handler:
+                        self.default_handler(address, *values)
 
     @staticmethod
     def _match_address(smart_address, target_address):
