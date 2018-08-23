@@ -32,8 +32,8 @@ def ServerClass(cls):
         for m in dir(self):
             meth = getattr(self, m)
             if hasattr(meth, '_address'):
-                server, address, sock = meth._address
-                server.bind(address, meth, sock)
+                server, address, sock, get_address = meth._address
+                server.bind(address, meth, sock, get_address=get_address)
 
     cls.__init__ = __init__
     return cls
@@ -84,7 +84,7 @@ class OSCThreadServer(object):
         self._smart_address_cache = {}
         self._smart_part_cache = {}
 
-    def bind(self, address, callback, sock=None):
+    def bind(self, address, callback, sock=None, get_address=False):
         """Bind a callback to an osc address.
 
         A socket in the list of existing sockets of the server can be
@@ -107,8 +107,9 @@ class OSCThreadServer(object):
             address = self.create_smart_address(address)
 
         callbacks = self.addresses.get((sock, address), [])
-        if callback not in callbacks:
-            callbacks.append(callback)
+        cb = (callback, get_address)
+        if cb not in callbacks:
+            callbacks.append(cb)
         self.addresses[(sock, address)] = callbacks
 
     def create_smart_address(self, address):
@@ -179,8 +180,14 @@ class OSCThreadServer(object):
             raise RuntimeError('no default socket yet and no socket provided')
 
         callbacks = self.addresses.get((sock, address), [])
-        while callback in callbacks:
-            callbacks.remove(callback)
+        to_remove = []
+        for cb in callbacks:
+            if cb[0] == callback:
+                to_remove.append(cb)
+
+        while to_remove:
+            callbacks.remove(to_remove.pop())
+
         self.addresses[(sock, address)] = callbacks
 
     def listen(
@@ -297,12 +304,20 @@ class OSCThreadServer(object):
                     if advanced_matching:
                         for sock, addr in addresses:
                             if sock == sender_socket and match(addr, address):
-                                for cb in addresses[(sock, addr)]:
-                                    cb(*values)
+                                for cb, get_address in addresses[(sock, addr)]:
+                                    if get_address:
+                                        cb(address, *values)
+                                    else:
+                                        cb(*values)
 
                     else:
-                        for cb in addresses.get((sender_socket, address), []):
-                            cb(*values)
+                        for cb, get_address in addresses.get(
+                            (sender_socket, address), []
+                        ):
+                            if get_address:
+                                cb(address, *values)
+                            else:
+                                cb(*values)
 
     @staticmethod
     def _match_address(smart_address, target_address):
@@ -393,10 +408,13 @@ class OSCThreadServer(object):
                 address, values, ip_address, response_port, sock=sock
             )
 
-    def address(self, address, sock=None):
+    def address(self, address, sock=None, get_address=False):
         """Decorate functions to bind them from their definition.
 
         `address` is the osc address to bind to the callback.
+        if `get_address` is set to True, the first parameter the
+        callback will receive will be the address that matched (useful
+        with advanced matching).
 
         example:
             server = OSCThreadServer()
@@ -415,17 +433,19 @@ class OSCThreadServer(object):
             To bind a method use the `address_method` decorator.
         """
         def decorator(callback):
-            self.bind(address, callback, sock)
+            self.bind(address, callback, sock, get_address=get_address)
             return callback
 
         return decorator
 
-    def address_method(self, address, sock=None):
+    def address_method(self, address, sock=None, get_address=False):
         """Decorate methods to bind them from their definition.
 
         The class defining the method must itself be decorated with the
         `ServerClass` decorator, the methods will be bound to the
         address when the class is instantiated.
+
+        See `address` for more information about the parameters.
 
         example:
 
@@ -440,7 +460,7 @@ class OSCThreadServer(object):
                     print("success!", args)
         """
         def decorator(decorated):
-            decorated._address = (self, address, sock)
+            decorated._address = (self, address, sock, get_address)
             return decorated
 
         return decorator
