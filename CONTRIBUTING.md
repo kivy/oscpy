@@ -28,7 +28,7 @@ provided.
 
 - Please keep performance in mind when editing the code, if you
   see room for improvement, share your suggestions by opening an issue,
-  or open a pull request direcly.
+  or open a pull request directly.
 
 - Please keep in mind that the code you contribute will be subject to the MIT
   license, don't include code if it's not under a compatible license, and you
