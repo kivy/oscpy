@@ -568,7 +568,7 @@ def test_answer():
     def ping(*values):
         print("ping called")
         if True in values:
-            cont.append(True)
+            osc_1.answer(b'/zip', [True], port=8000)
         else:
             osc_1.answer(
                 bundle=[
@@ -583,6 +583,15 @@ def test_answer():
     def pong(*values):
         print("pong called")
         osc_2.answer(b'/ping', [True])
+
+    osc_3 = OSCThreadServer()
+    osc_3.listen(default=True, port=8000)
+
+    @osc_3.address(b'/zip')
+    def zip(*values):
+        print("zip called")
+        if True in values:
+            cont.append(True)
 
     osc_2.send_message(b'/ping', [], *osc_1.getaddress())
 
