@@ -5,6 +5,10 @@ from oscpy.parser import (
     format_message, format_bundle, timetag_to_time, time_to_timetag
 )
 from pytest import approx, raises
+from hypothesis import given, example, assume, settings, Verbosity
+from hypothesis.strategies import \
+    text, binary, floats, integers, lists, tuples, choices, one_of
+
 from time import time
 import struct
 
@@ -239,3 +243,29 @@ def test_format_encoding():
         format_message('/test', [s], encoding='utf8'),
         encoding='ascii', encoding_errors='replace'
     )[2][0] == u'������������'
+
+
+@given(
+    lists(
+        one_of(
+            binary(),
+            floats(
+                allow_nan=False,
+                min_value=-2147483647,
+                max_value=2147483647
+            ),
+            integers(
+                min_value=-2147483648,
+                max_value=2147483647
+            )
+        ),
+    )
+)
+def test_decode_encoded(args):
+    for x in args:
+        assume(not (isinstance(x, bytes) and b'\x00' in x))
+
+    assert read_message(format_message(b'/test', values=args))[2] == [
+        approx(x) if isinstance(x, float) else x
+        for x in args
+    ]
