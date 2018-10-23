@@ -1,46 +1,56 @@
-matrix:
-  include:
-    - os: linux
-      sudo: required
-      python: 3.4
-      env: TOXENV=py34
-    - os: linux
-      sudo: required
-      python: 3.5
-      env: TOXENV=py35
-    - os: linux
-      sudo: required
-      python: 3.6
-      env: TOXENV=py36
-    - os: linux
-      dist: xenial
-      sudo: required
-      python: 3.7
-      sudo: true
-      env: TOXENV=py37
-    - os: linux
-      dist: xenial
-      sudo: required
-      python: 3.8-dev
-      sudo: true
-      env: TOXENV=py38-dev
+# stolen from https://travis-ci.org/tornadoweb/tornado
 
-    - os: osx
-      language: generic
-      env: TOXENV=py27
-    - os: osx
-      language: generic
-      env: TOXENV=py34
-    - os: osx
-      language: generic
-      env: TOXENV=py35
-    - os: osx
-      language: generic
-      env: TOXENV=py36
+# Most tests run in container mode because it's faster to start up,
+# but a few below use different configurations (as of July 2018
+# only trusty is available in containers).
+dist: trusty
+sudo: false
+
+matrix:
+    fast_finish: true
+
+language: python
+# For a list of available versions, run
+#     aws s3 ls s3://travis-python-archives/binaries/ubuntu/14.04/x86_64/
+#
+# Python 3.7+ needs a newer version of openssl than is available in trusty,
+# so these must run on a newer platform (and since travis doesn't yet have
+# containers for xenial, those must use VMs).
+# YAML magic from https://github.com/travis-ci/travis-ci/issues/9069#issuecomment-401924248
+.mixins:
+- &xenial-mixin
+  dist: xenial
+  sudo: true
+  addons:
+    apt:
+      packages:
+        - libgnutls-dev
+jobs:
+  include:
+    - python: 3.5
+    - python: 3.6
+    - python: pypy3.5-5.10.1
+    - <<: *xenial-mixin
+      python: 3.7
+    - <<: *xenial-mixin
+      python: nightly
 
 install:
-  - pip install --user --editable .[dev,travis]
+    # On nightly, upgrade setuptools first to work around
+    # https://github.com/pypa/setuptools/issues/1257
+    - if [[ $TRAVIS_PYTHON_VERSION == 'nightly' ]]; then travis_retry pip install -U setuptools; fi
+    - travis_retry python setup.py install
+    - travis_retry pip install codecov virtualenv
+    # Create a separate no-dependencies virtualenv to make sure all imports
+    # of optional-dependencies are guarded.
+    - virtualenv /tmp/nodeps
+    - /tmp/nodeps/bin/python -VV
+    - /tmp/nodeps/bin/pip install --editable .[dev,travis]
+    # document which versions where installed
+    - pip freeze
 
 script:
   - pytest tests/ --cov oscpy/ --cov-branch
+
+after_success:
   - travis_retry coveralls
