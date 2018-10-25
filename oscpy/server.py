@@ -267,8 +267,15 @@ class OSCThreadServer(object):
 
         return sock.getsockname()
 
-    def stop(self, s):
-        """Close and remove a socket from the server's sockets."""
+    def stop(self, s=None):
+        """Close and remove a socket from the server's sockets.
+
+        If `sock` is None, uses the default socket for the server.
+
+        """
+        if not s and self.default_socket:
+            s = self.default_socket
+
         if s in self.sockets:
             s.close()
             self.sockets.remove(s)
