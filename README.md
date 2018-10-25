@@ -23,6 +23,10 @@ A modern implementation of OSC for python2/3.
 - a thread based udp server to open sockets and bind callbacks on osc addresses on them
 - a simple client
 
+#### Install
+```sh
+pip install oscpy
+```
 
 #### Usage
 
