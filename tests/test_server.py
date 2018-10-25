@@ -66,6 +66,14 @@ def test_stop_unknown():
         osc.stop(socket.socket())
 
 
+def test_stop_default():
+    osc = OSCThreadServer()
+    osc.listen(default=True)
+    assert len(osc.sockets) == 1
+    osc.stop()
+    assert len(osc.sockets) == 0
+
+
 def test_stop_all():
     osc = OSCThreadServer()
     osc.listen(default=True)
