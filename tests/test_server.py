@@ -76,11 +76,15 @@ def test_stop_default():
 
 def test_stop_all():
     osc = OSCThreadServer()
-    osc.listen(default=True)
+    sock = osc.listen(default=True)
+    host, port = sock.getsockname()
     osc.listen()
     assert len(osc.sockets) == 2
     osc.stop_all()
     assert len(osc.sockets) == 0
+    osc.listen(address=host, port=port)
+    assert len(osc.sockets) == 1
+    osc.stop_all()
 
 
 def test_send_message_without_socket():
