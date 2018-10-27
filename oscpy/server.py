@@ -475,7 +475,7 @@ class OSCThreadServer(object):
             class MyServer(object):
 
                 @osc.address_method(b'/test')
-                def success(*args):
+                def success(self, *args):
                     print("success!", args)
         """
         def decorator(decorated):
