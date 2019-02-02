@@ -698,7 +698,7 @@ def test_socket_family():
         assert osc.listen(address=filename, family='unix').family == socket.AF_UNIX  # noqa
 
     else:
-        with pytest.raises(NameError) as e_info:
+        with pytest.raises(AttributeError) as e_info:
             osc.listen(address=filename, family='unix')
 
     if exists(filename):
