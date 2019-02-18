@@ -5,6 +5,17 @@
 
 A modern implementation of OSC for python2/3.
 
+#### What is OSC.
+
+OpenSoundControl is an UDP based network protocol, that is designed for fast
+dispatching of time-sensitive messages, as the name suggests, it was designed
+as a replacement for MIDI, but applies well to other situations. The protocol is
+simple to use, OSC addresses look like http URLs, and accept various basic
+types, such as string, float, int, etc. You can think of it basically as an
+http POST, with less overhead.
+
+You can learn more about OSC on [OpenSoundControl.org](http://opensoundcontrol.org/introduction-osc)
+
 #### Goals
 
 - python2.7/3.6+ compatibility (can be relaxed more on the python3 side
