@@ -79,11 +79,26 @@ def parse_blob(value, offset=0, **kwargs):
     return data, padded(length, 8)
 
 
+def parse_midi(value, offset=0, **kwargs):
+    """Return a MIDI tuple from offset in value.
+
+    A valid MIDI message: (port id, status byte, data1, data2).
+    """
+    val = unpack_from('>I', value, offset)[0]
+    midi = tuple((val & 0xFF << 8 * i) >> 8 * i for i in range(3, -1, -1))
+    return midi, len(midi)
+
+
+def format_midi(value):
+    return sum((val & 0xFF) << 8 * (3 - pos) for pos, val in enumerate(value))
+
+
 parsers = {
     b'i': parse_int,
     b'f': parse_float,
     b's': parse_string,
     b'b': parse_blob,
+    b'm': parse_midi,
 }
 
 parsers.update({
@@ -96,6 +111,7 @@ writers = (
     (int, (b'i', b'i')),
     (bytes, (b's', b'%is')),
     (bytearray, (b'b', b'%ib')),
+    (tuple, (b'm', b'I'))
 )
 
 # XXX in case someone imported writters from us, keep the misspelled
@@ -145,6 +161,8 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
                 if b'%i' in f:
                     v += b'\0'
                     f = f % padded(len(v), padsizes[cls])
+                if b'm' in tag:
+                    values[i] = format_midi(v)
 
                 tags.append(tag)
                 fmt.append(f)
