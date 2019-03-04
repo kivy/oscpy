@@ -9,6 +9,7 @@ Allowed types are:
     bytearray (raw data) -> osc blob
 
 """
+from collections import namedtuple
 from struct import Struct, pack, unpack_from, calcsize
 from time import time
 import sys
@@ -26,6 +27,8 @@ TimeTag = Struct('>II')
 TP_PACKET_FORMAT = "!12I"
 # 1970-01-01 00:00:00
 NTP_DELTA = 2208988800
+
+MidiTuple = namedtuple('MidiTuple', 'port_id status_byte data1 data2')
 
 
 def padded(l, n=4):
@@ -85,7 +88,8 @@ def parse_midi(value, offset=0, **kwargs):
     A valid MIDI message: (port id, status byte, data1, data2).
     """
     val = unpack_from('>I', value, offset)[0]
-    midi = tuple((val & 0xFF << 8 * i) >> 8 * i for i in range(3, -1, -1))
+    args = tuple((val & 0xFF << 8 * i) >> 8 * i for i in range(3, -1, -1))
+    midi = MidiTuple(*args)
     return midi, len(midi)
 
 
@@ -111,7 +115,7 @@ writers = (
     (int, (b'i', b'i')),
     (bytes, (b's', b'%is')),
     (bytearray, (b'b', b'%ib')),
-    (tuple, (b'm', b'I'))
+    (MidiTuple, (b'm', b'I'))
 )
 
 # XXX in case someone imported writters from us, keep the misspelled
