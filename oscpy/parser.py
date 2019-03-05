@@ -15,8 +15,10 @@ import sys
 
 if sys.version_info.major > 2:
     UNICODE = str
+    izip = zip
 else:
     UNICODE = unicode
+    from itertools import izip
 
 Int = Struct('>i')
 Float = Struct('>f')
@@ -56,9 +58,10 @@ def parse_string(value, offset=0, encoding='', encoding_errors='strict'):
     """
     result = []
     n = 0
+    ss = String.size
     while True:
         c = String.unpack_from(value, offset + n)[0]
-        n += String.size
+        n += ss
 
         if c == b'\0':
             break
@@ -95,6 +98,7 @@ writers = (
     (float, (b'f', b'f')),
     (int, (b'i', b'i')),
     (bytes, (b's', b'%is')),
+    (UNICODE, (b's', b'%is')),
     (bytearray, (b'b', b'%ib')),
 )
 
@@ -131,20 +135,27 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
     """Create a message."""
     tags = [b',']
     fmt = []
-    if encoding:
-        values = values[:]
+
+    encode_cache = {}
 
     for i, v in enumerate(values):
-        if encoding and isinstance(v, UNICODE):
-            v = v.encode(encoding, errors=encoding_errors)
-            values[i] = v
-
         for cls, writer in writers:
             if isinstance(v, cls):
+                if cls == UNICODE:
+                    if encoding:
+                        cls = bytes
+                        if v in encode_cache:
+                            v = encode_cache[v]
+                        else:
+                            v = encode_cache.setdefault(
+                                v, v.encode(encoding, errors=encoding_errors)
+                            )
+                    else:
+                        raise TypeError(u"Can't format unicode string without encoding")
+
                 tag, f = writer
                 if b'%i' in f:
-                    v += b'\0'
-                    f = f % padded(len(v), padsizes[cls])
+                    f = f % padded(len(v) + 1, padsizes[cls])
 
                 tags.append(tag)
                 fmt.append(f)
@@ -165,7 +176,21 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
         address += b'\0'
 
     fmt = b'>%is%is%s' % (padded(len(address)), padded(len(tags)), fmt)
-    return pack(fmt, address, tags, *values)
+    return pack(
+        fmt,
+        address,
+        tags,
+        *(
+            (
+                encode_cache.get(v) + b'\0' if isinstance(v, UNICODE) and encoding
+                else (v + b'\0') if t in (b's', b'b')
+                else format_midi(v) if isinstance(v, MidiTuple)
+                else v
+            )
+            for t, v in
+            izip(tags[1:], values)
+        )
+    )
 
 
 def read_message(data, offset=0, encoding='', encoding_errors='strict'):
