@@ -1,6 +1,6 @@
 """Parse and format data types, from and to packets that can be sent.
 
-types are automatically inferred using the `parsers` and `writers` members.
+types are automatically inferred using the `PARSERS` and `WRITERS` members.
 
 Allowed types are:
     int (but not *long* ints) -> osc int
@@ -9,6 +9,15 @@ Allowed types are:
     bytearray (raw data) -> osc blob
 
 """
+
+__all__ = (
+    'parse',
+    'read_packet', 'read_message', 'read_bundle',
+    'format_bundle', 'format_message',
+    'MidiTuple',
+)
+
+
 from struct import Struct, pack, unpack_from, calcsize
 from time import time
 import sys
@@ -20,14 +29,16 @@ else:
     UNICODE = unicode
     from itertools import izip
 
-Int = Struct('>i')
-Float = Struct('>f')
-String = Struct('>s')
-TimeTag = Struct('>II')
+INT = Struct('>i')
+FLOAT = Struct('>f')
+STRING = Struct('>s')
+TIME_TAG = Struct('>II')
 
 TP_PACKET_FORMAT = "!12I"
 # 1970-01-01 00:00:00
 NTP_DELTA = 2208988800
+
+NULL = b'\0'
 
 
 def padded(l, n=4):
@@ -36,18 +47,17 @@ def padded(l, n=4):
     - `l` being the current size of the thing.
     - `n` being the desired divisor of the thing's padded size.
     """
-    m, r = divmod(l, n)
-    return n * (min(1, r) + l // n)
+    return n * (min(1, divmod(l, n)[1]) + l // n)
 
 
 def parse_int(value, offset=0, **kwargs):
     """Return an int from offset in value."""
-    return Int.unpack_from(value, offset)[0], Int.size
+    return INT.unpack_from(value, offset)[0], INT.size
 
 
 def parse_float(value, offset=0, **kwargs):
     """Return a float from offset in value."""
-    return Float.unpack_from(value, offset)[0], Float.size
+    return FLOAT.unpack_from(value, offset)[0], FLOAT.size
 
 
 def parse_string(value, offset=0, encoding='', encoding_errors='strict'):
@@ -57,21 +67,21 @@ def parse_string(value, offset=0, encoding='', encoding_errors='strict'):
     will be used to manage encoding errors in decoding.
     """
     result = []
-    n = 0
-    ss = String.size
+    count = 0
+    ss = STRING.size
     while True:
-        c = String.unpack_from(value, offset + n)[0]
-        n += ss
+        c = STRING.unpack_from(value, offset + count)[0]
+        count += ss
 
-        if c == b'\0':
+        if c == NULL:
             break
         result.append(c)
 
     r = b''.join(result)
     if encoding:
-        return r.decode(encoding, errors=encoding_errors), padded(n)
+        return r.decode(encoding, errors=encoding_errors), padded(count)
     else:
-        return r, padded(n)
+        return r, padded(count)
 
 
 def parse_blob(value, offset=0, **kwargs):
@@ -82,19 +92,21 @@ def parse_blob(value, offset=0, **kwargs):
     return data, padded(length, 8)
 
 
-parsers = {
+PARSERS = {
     b'i': parse_int,
     b'f': parse_float,
     b's': parse_string,
     b'b': parse_blob,
 }
 
-parsers.update({
+
+PARSERS.update({
     ord(k): v
-    for k, v in parsers.items()
+    for k, v in PARSERS.items()
 })
 
-writers = (
+
+WRITERS = (
     (float, (b'f', b'f')),
     (int, (b'i', b'i')),
     (bytes, (b's', b'%is')),
@@ -102,11 +114,8 @@ writers = (
     (bytearray, (b'b', b'%ib')),
 )
 
-# XXX in case someone imported writters from us, keep the misspelled
-# version around for some time
-writters = writers
 
-padsizes = {
+PADSIZES = {
     bytes: 4,
     bytearray: 8
 }
@@ -118,7 +127,7 @@ def parse(hint, value, offset=0, encoding='', encoding_errors='strict'):
     `hint` will be used to determine the correct parser, other parameters
     will be passed to this parser.
     """
-    parser = parsers.get(hint)
+    parser = PARSERS.get(hint)
 
     if not parser:
         raise ValueError(
@@ -138,42 +147,47 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
 
     encode_cache = {}
 
-    for i, v in enumerate(values):
-        for cls, writer in writers:
-            if isinstance(v, cls):
-                if cls == UNICODE:
-                    if encoding:
-                        cls = bytes
-                        if v in encode_cache:
-                            v = encode_cache[v]
-                        else:
-                            v = encode_cache.setdefault(
-                                v, v.encode(encoding, errors=encoding_errors)
-                            )
-                    else:
-                        raise TypeError(u"Can't format unicode string without encoding")
-
-                tag, f = writer
-                if b'%i' in f:
-                    f = f % padded(len(v) + 1, padsizes[cls])
-
-                tags.append(tag)
-                fmt.append(f)
+    for value in values:
+        cls, writer = None, None
+        for cls, writer in WRITERS:
+            if isinstance(value, cls):
                 break
         else:
             raise TypeError(
                 u'unable to find a writer for value {}, type not in: {}.'
-                .format(v, [x[0] for x in writers])
+                .format(value, [x[0] for x in WRITERS])
             )
 
+        if cls == UNICODE:
+            if not encoding:
+                raise TypeError(u"Can't format unicode string without encoding")
+
+            cls = bytes
+            value = (
+                encode_cache[value]
+                if value in encode_cache else
+                encode_cache.setdefault(
+                    value, value.encode(encoding, errors=encoding_errors)
+                )
+            )
+
+        assert cls, writer
+
+        tag, v_fmt = writer
+        if b'%i' in v_fmt:
+            v_fmt = v_fmt % padded(len(value) + 1, PADSIZES[cls])
+
+        tags.append(tag)
+        fmt.append(v_fmt)
+
     fmt = b''.join(fmt)
-    tags = b''.join(tags + [b'\0'])
+    tags = b''.join(tags + [NULL])
 
     if encoding and isinstance(address, UNICODE):
         address = address.encode(encoding, errors=encoding_errors)
 
-    if not address.endswith(b'\0'):
-        address += b'\0'
+    if not address.endswith(NULL):
+        address += NULL
 
     fmt = b'>%is%is%s' % (padded(len(address)), padded(len(tags)), fmt)
     return pack(
@@ -182,9 +196,8 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
         tags,
         *(
             (
-                encode_cache.get(v) + b'\0' if isinstance(v, UNICODE) and encoding
-                else (v + b'\0') if t in (b's', b'b')
-                else format_midi(v) if isinstance(v, MidiTuple)
+                encode_cache.get(v) + NULL if isinstance(v, UNICODE) and encoding
+                else (v + NULL) if t in (b's', b'b')
                 else v
             )
             for t, v in
@@ -200,38 +213,38 @@ def read_message(data, offset=0, encoding='', encoding_errors='strict'):
     extracted from a bundle.
     """
     address, size = parse_string(data, offset=offset)
-    n = size
+    index = size
     if not address.startswith(b'/'):
         raise ValueError("address {} doesn't start with a '/'".format(address))
 
-    tags, size = parse_string(data, offset=offset + n)
+    tags, size = parse_string(data, offset=offset + index)
     if not tags.startswith(b','):
         raise ValueError("tag string {} doesn't start with a ','".format(tags))
     tags = tags[1:]
 
-    n += size
+    index += size
 
     values = []
     for tag in tags:
-        v, off = parse(
-            tag, data, offset=offset + n, encoding=encoding,
+        value, off = parse(
+            tag, data, offset=offset + index, encoding=encoding,
             encoding_errors=encoding_errors
         )
-        values.append(v)
-        n += off
+        values.append(value)
+        index += off
 
-    return address, tags, values, n
+    return address, tags, values, index
 
 
-def time_to_timetag(time):
+def time_to_timetag(value):
     """Create a timetag from a time.
 
     `time` is an unix timestamp (number of seconds since 1/1/1970).
     result is the equivalent time using the NTP format.
     """
-    if time is None:
+    if value is None:
         return (0, 1)
-    seconds, fract = divmod(time, 1)
+    seconds, fract = divmod(value, 1)
     seconds += NTP_DELTA
     seconds = int(seconds)
     fract = int(fract * 2**32)
@@ -260,7 +273,7 @@ def format_bundle(data, timetag=None, encoding='', encoding_errors='strict'):
     """
     timetag = time_to_timetag(timetag)
     bundle = [pack('8s', b'#bundle\0')]
-    bundle.append(TimeTag.pack(*timetag))
+    bundle.append(TIME_TAG.pack(*timetag))
 
     for address, values in data:
         msg = format_message(
@@ -278,20 +291,20 @@ def read_bundle(data, encoding='', encoding_errors='strict'):
     length = len(data)
 
     header = unpack_from('7s', data, 0)[0]
-    offset = 8 * String.size
+    offset = 8 * STRING.size
     if header != b'#bundle':
         raise ValueError(
             "the message doesn't start with '#bundle': {}".format(header))
 
-    timetag = timetag_to_time(TimeTag.unpack_from(data, offset))
-    offset += TimeTag.size
+    timetag = timetag_to_time(TIME_TAG.unpack_from(data, offset))
+    offset += TIME_TAG.size
 
     messages = []
     while offset < length:
         # NOTE, we don't really care about the size of the message, our
         # parsing will compute it anyway
         # size = Int.unpack_from(data, offset)
-        offset += Int.size
+        offset += INT.size
         address, tags, values, off = read_message(
             data, offset, encoding=encoding, encoding_errors=encoding_errors
         )
@@ -308,8 +321,8 @@ def read_packet(data, drop_late=False, encoding='', encoding_errors='strict'):
     If drop_late is true, and the received data is an expired bundle,
     then returns an empty list.
     """
-    d = unpack_from('>c', data, 0)[0]
-    if d == b'/':
+    header = unpack_from('>c', data, 0)[0]
+    if header == b'/':
         return [
             read_message(
                 data, encoding=encoding,
@@ -317,7 +330,7 @@ def read_packet(data, drop_late=False, encoding='', encoding_errors='strict'):
             )
         ]
 
-    elif d == b'#':
+    elif header == b'#':
         timetag, messages = read_bundle(
             data, encoding=encoding, encoding_errors=encoding_errors
         )
