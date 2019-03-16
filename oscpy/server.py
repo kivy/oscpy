@@ -391,7 +391,9 @@ class OSCThreadServer(object):
             ip_address,
             port,
             sock=sock,
-            safer=safer
+            safer=safer,
+            encoding=self.encoding,
+            encoding_errors=self.encoding_errors
         )
 
     def send_bundle(
@@ -412,7 +414,9 @@ class OSCThreadServer(object):
             ip_address,
             port,
             sock=sock,
-            safer=safer
+            safer=safer,
+            encoding=self.encoding,
+            encoding_errors=self.encoding_errors
         )
 
     def answer(
@@ -535,13 +539,29 @@ class OSCThreadServer(object):
         self.bind(b'/_oscpy/stats/sent', self._get_stats_sent, sock=sock)
 
     def _get_version(self, port, *args):
-        self.answer(b'/_oscpy/version/answer', (__version__, ), port=port)
+        self.answer(
+            b'/_oscpy/version/answer',
+            (__version__, ),
+            port=port
+        )
 
     def _get_routes(self, port, *args):
-        self.answer(b'/_oscpy/routes/answer', [a[1] for a in self.addresses], port=port)
+        self.answer(
+            b'/_oscpy/routes/answer',
+            [a[1] for a in self.addresses],
+            port=port
+        )
 
     def _get_stats_received(self, port, *args):
-        self.answer(b'/_oscpy/stats/received/answer', self.stats_received.to_tuple(), port=port)
+        self.answer(
+            b'/_oscpy/stats/received/answer',
+            self.stats_received.to_tuple(),
+            port=port
+        )
 
     def _get_stats_sent(self, port, *args):
-        self.answer(b'/_oscpy/stats/sent/answer', self.stats_sent.to_tuple(), port=port)
+        self.answer(
+            b'/_oscpy/stats/sent/answer',
+            self.stats_sent.to_tuple(),
+            port=port
+        )
