@@ -9,6 +9,7 @@ from ast import literal_eval
 from oscpy.client import send_message
 from oscpy.server import OSCThreadServer
 
+
 def _send(options):
     def _parse(s):
         try:
@@ -26,6 +27,7 @@ def _send(options):
             encoding=options.encoding,
             encoding_errors=options.encoding_errors
         )
+
 
 def _dump(options):
     def dump(address, *values):
