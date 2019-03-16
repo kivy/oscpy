@@ -316,10 +316,17 @@ class OSCThreadServer(object):
                 sleep(.01)
                 continue
             else:
-                read, write, error = select(self.sockets, [], [], self.timeout)
+                try:
+                    read, write, error = select(self.sockets, [], [], self.timeout)
+                except (ValueError, socket.error):
+                    continue
 
             for sender_socket in read:
-                data, sender = sender_socket.recvfrom(65535)
+                try:
+                    data, sender = sender_socket.recvfrom(65535)
+                except OSError:
+                    # socket was closed during recv?
+                    continue
                 for address, tags, values, offset in read_packet(
                     data, drop_late=drop_late, encoding=self.encoding,
                     encoding_errors=self.encoding_errors
