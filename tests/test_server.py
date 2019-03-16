@@ -9,6 +9,7 @@ from os import unlink
 
 from oscpy.server import OSCThreadServer, ServerClass
 from oscpy.client import send_message, send_bundle
+from oscpy import __version__
 
 
 def test_instance():
@@ -778,3 +779,66 @@ def test_default_handler():
 
     for e, r in zip(expected, results):
         assert e == r
+
+
+def test_get_version():
+    osc = OSCThreadServer(encoding='utf8')
+    osc.listen(default=True)
+
+    values = []
+
+    @osc.address(u'/_oscpy/version/answer')
+    def cb(val):
+        print(val)
+        values.append(val)
+
+    send_message(
+        b'/_oscpy/version',
+        [
+            osc.getaddress()[1]
+        ],
+        *osc.getaddress(),
+        encoding='utf8',
+        encoding_errors='strict'
+    )
+
+    timeout = time() + 2
+    while not values:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
+
+    assert __version__ in values
+
+
+def test_get_routes():
+    osc = OSCThreadServer(encoding='utf8')
+    osc.listen(default=True)
+
+    values = []
+
+    @osc.address(u'/test_route')
+    def dummy(*val):
+        pass
+
+    @osc.address(u'/_oscpy/routes/answer')
+    def cb(*routes):
+        values.extend(routes)
+
+    send_message(
+        b'/_oscpy/routes',
+        [
+            osc.getaddress()[1]
+        ],
+        *osc.getaddress(),
+        encoding='utf8',
+        encoding_errors='strict'
+    )
+
+    timeout = time() + 2
+    while not values:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
+
+    assert u'/test_route' in values
