@@ -46,7 +46,9 @@ setup(
     },
     package_data={},
     data_files=[],
-    entry_points={},
+    entry_points={
+        'console_scripts': ['oscli=oscpy.cli:main'],
+    },
 
     project_urls={
         'Bug Reports': URL + '/issues',
