@@ -8,6 +8,7 @@ from ast import literal_eval
 
 from oscpy.client import send_message
 from oscpy.server import OSCThreadServer
+from oscpy.stats import Stats
 
 
 def _send(options):
@@ -17,8 +18,9 @@ def _send(options):
         except:
             return s
 
+    stats = Stats()
     for i in range(options.repeat):
-        send_message(
+        stats += send_message(
             options.address,
             [_parse(x) for x in options.message],
             options.host,
@@ -27,11 +29,22 @@ def _send(options):
             encoding=options.encoding,
             encoding_errors=options.encoding_errors
         )
+    print(stats)
 
 
-def _dump(options):
+def __dump(options):
     def dump(address, *values):
-        print('{}: {}'.format(address, values))
+        print(u'{}: {}'.format(
+            address.decode('utf8'),
+            ', '.join(
+                '{}'.format(
+                    v.decode(options.encoding or 'utf8')
+                    if isinstance(v, bytes)
+                    else v
+                )
+                for v in values if values
+            )
+        ))
 
     osc = OSCThreadServer(
         encoding=options.encoding,
@@ -43,11 +56,19 @@ def _dump(options):
         port=options.port,
         default=True
     )
-    while True:
-        sleep(10)
+    return osc
 
 
-def main():
+def _dump(options): # pragma: no cover
+    osc = __dump(options)
+    try:
+        while True:
+            sleep(10)
+    finally:
+        osc.stop()
+
+
+def init_parser():
     parser = ArgumentParser(description='OSCPy command line interface')
 
     subparser = parser.add_subparsers()
@@ -84,6 +105,10 @@ def main():
                       help='how to treat string encoding issues')
 
     # bridge = parser.add_parser('bridge', help='listen for messages and redirect them to a server')
+    return parser
 
+
+def main(): # pragma: no cover
+    parser = init_parser()
     options = parser.parse_args()
     exit(options.func(options))

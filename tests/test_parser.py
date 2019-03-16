@@ -212,9 +212,9 @@ def test_format_bundle():
     assert stats.calls == 2
     assert stats.bytes == 72
     assert stats.params == 6
-    assert stats.types[b'f'] == 3
-    assert stats.types[b'i'] == 2
-    assert stats.types[b's'] == 1
+    assert stats.types['f'] == 3
+    assert stats.types['i'] == 2
+    assert stats.types['s'] == 1
 
 
 def test_timetag():
