@@ -24,10 +24,10 @@ import sys
 from collections import Counter
 from oscpy.stats import Stats
 
-if sys.version_info.major > 2:
+if sys.version_info.major > 2:  # pragma: no cover
     UNICODE = str
     izip = zip
-else:
+else:  # pragma: no cover
     UNICODE = unicode
     from itertools import izip
 
