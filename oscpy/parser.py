@@ -185,7 +185,7 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
 
         tags.append(tag)
         fmt.append(v_fmt)
-        count[tag] += 1
+        count[tag.decode('utf8')] += 1
 
     fmt = b''.join(fmt)
     tags = b''.join(tags + [NULL])
