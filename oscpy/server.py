@@ -5,16 +5,19 @@ This module currently only implements `OSCThreadServer`, a thread based server.
 
 from threading import Thread
 
-from select import select
-import socket
-import inspect
-from time import sleep
 import os
 import re
+import inspect
 from sys import platform
+from time import sleep, time
+from functools import partial
+from select import select
+import socket
 
+from oscpy import __version__
 from oscpy.parser import read_packet, UNICODE
 from oscpy.client import send_bundle, send_message
+from oscpy.stats import Stats
 
 
 def ServerClass(cls):
@@ -44,6 +47,9 @@ class OSCThreadServer(object):
 
     Listens for osc messages in a thread, and dispatches the messages
     values to callbacks from there.
+
+    The '/_oscpy/' namespace is reserved for metadata about the OSCPy
+    internals, please see package documentation for further details.
     """
 
     def __init__(
@@ -81,6 +87,10 @@ class OSCThreadServer(object):
         self.encoding = encoding
         self.encoding_errors = encoding_errors
         self.default_handler = default_handler
+
+        self.stats_received = Stats()
+        self.stats_sent = Stats()
+
         t = Thread(target=self._listen)
         t.daemon = True
         t.start()
@@ -235,6 +245,7 @@ class OSCThreadServer(object):
                 'Only one default socket authorized! Please set '
                 'default=False to other calls to listen()'
             )
+        self.bind_meta_routes(sock)
         return sock
 
     def close(self, sock=None):
@@ -297,6 +308,7 @@ class OSCThreadServer(object):
         match = self._match_address
         advanced_matching = self.advanced_matching
         addresses = self.addresses
+        stats = self.stats_received
 
         while True:
             drop_late = self.drop_late_bundles
@@ -308,10 +320,15 @@ class OSCThreadServer(object):
 
             for sender_socket in read:
                 data, sender = sender_socket.recvfrom(65535)
-                for address, types, values, offset in read_packet(
+                for address, tags, values, offset in read_packet(
                     data, drop_late=drop_late, encoding=self.encoding,
                     encoding_errors=self.encoding_errors
                 ):
+                    stats.calls += 1
+                    stats.bytes += offset
+                    stats.params += len(values)
+                    stats.types.update(tags)
+
                     matched = False
                     if advanced_matching:
                         for sock, addr in addresses:
@@ -368,8 +385,14 @@ class OSCThreadServer(object):
         elif not sock:
             raise RuntimeError('no default socket yet and no socket provided')
 
-        send_message(
-            osc_address, values, ip_address, port, sock=sock, safer=safer)
+        self.stats_sent += send_message(
+            osc_address,
+            values,
+            ip_address,
+            port,
+            sock=sock,
+            safer=safer
+        )
 
     def send_bundle(
         self, messages, ip_address, port, timetag=None, sock=None, safer=False
@@ -384,7 +407,13 @@ class OSCThreadServer(object):
         elif not sock:
             raise RuntimeError('no default socket yet and no socket provided')
 
-        send_bundle(messages, ip_address, port, sock=sock, safer=safer)
+        self.stats_sent += send_bundle(
+            messages,
+            ip_address,
+            port,
+            sock=sock,
+            safer=safer
+        )
 
     def answer(
         self, address=None, values=None, bundle=None, timetag=None,
@@ -483,3 +512,36 @@ class OSCThreadServer(object):
             return decorated
 
         return decorator
+
+    def bind_meta_routes(self, sock=None):
+        """This module implements osc routes to probe the internal state of a
+        live OSCPy server. These routes are placed in the /_oscpy/ namespace,
+        and provide information such as the version, the existing routes, and
+        usage statistics of the server over time.
+
+        These requests will be sent back to the client's address/port that sent
+        them, with the osc address suffixed with '/answer'.
+
+        examples:
+            '/_oscpy/version' -> '/_oscpy/version/answer'
+            '/_oscpy/stats/received' -> '/_oscpy/stats/received/answer'
+
+        messages to these routes require a port number as argument, to
+        know to which port to send to.
+        """
+        self.bind(b'/_oscpy/version', self._get_version, sock=sock)
+        self.bind(b'/_oscpy/routes', self._get_routes, sock=sock)
+        self.bind(b'/_oscpy/stats/received', self._get_stats_received, sock=sock)
+        self.bind(b'/_oscpy/stats/sent', self._get_stats_sent, sock=sock)
+
+    def _get_version(self, port, *args):
+        self.answer(b'/_oscpy/version/answer', (__version__, ), port=port)
+
+    def _get_routes(self, port, *args):
+        self.answer(b'/_oscpy/routes/answer', [a[1] for a in self.addresses], port=port)
+
+    def _get_stats_received(self, port, *args):
+        self.answer(b'/_oscpy/stats/received/answer', self.stats_received.to_tuple(), port=port)
+
+    def _get_stats_sent(self, port, *args):
+        self.answer(b'/_oscpy/stats/sent/answer', self.stats_sent.to_tuple(), port=port)
