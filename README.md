@@ -162,6 +162,14 @@ send_message(
 
 (`u` literals added here for clarity).
 
+#### CLI
+
+OSCPy provides an "oscli" util, to help with debugging:
+- `oscli dump` to listen for messages and dump them
+- `oscli send` to send messages or bundles to a server
+
+See `oscli -h` for more information.
+
 #### TODO
 
 - real support for timetag (currently only supports optionally
