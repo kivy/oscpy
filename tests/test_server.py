@@ -162,46 +162,6 @@ def test_bind_get_address_smart():
             raise OSError('timeout while waiting for success message.')
 
 
-def test_bind_get_address():
-    osc = OSCThreadServer()
-    sock = osc.listen()
-    port = sock.getsockname()[1]
-    cont = []
-
-    def success(address, *values):
-        assert address == b'/success'
-        cont.append(True)
-
-    osc.bind(b'/success', success, sock, get_address=True)
-
-    send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port)
-
-    timeout = time() + 5
-    while not cont:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
-
-
-def test_bind_get_address_smart():
-    osc = OSCThreadServer(advanced_matching=True)
-    sock = osc.listen()
-    port = sock.getsockname()[1]
-    cont = []
-
-    def success(address, *values):
-        assert address == b'/success/a'
-        cont.append(True)
-
-    osc.bind(b'/success/?', success, sock, get_address=True)
-
-    send_message(b'/success/a', [b'test', 1, 1.12345], 'localhost', port)
-
-    timeout = time() + 5
-    while not cont:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
-
-
 def test_reuse_callback():
     osc = OSCThreadServer()
     sock = osc.listen()

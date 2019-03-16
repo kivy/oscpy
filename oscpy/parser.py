@@ -21,6 +21,8 @@ __all__ = (
 from struct import Struct, pack, unpack_from, calcsize
 from time import time
 import sys
+from collections import Counter
+from oscpy.stats import Stats
 
 if sys.version_info.major > 2:
     UNICODE = str
@@ -147,7 +149,11 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
 
     encode_cache = {}
 
+    lv = 0
+    count = Counter()
+
     for value in values:
+        lv += 1
         cls, writer = None, None
         for cls, writer in WRITERS:
             if isinstance(value, cls):
@@ -179,6 +185,7 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
 
         tags.append(tag)
         fmt.append(v_fmt)
+        count[tag] += 1
 
     fmt = b''.join(fmt)
     tags = b''.join(tags + [NULL])
@@ -190,7 +197,7 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
         address += NULL
 
     fmt = b'>%is%is%s' % (padded(len(address)), padded(len(tags)), fmt)
-    return pack(
+    message = pack(
         fmt,
         address,
         tags,
@@ -204,6 +211,7 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
             izip(tags[1:], values)
         )
     )
+    return message, Stats(1, len(message), lv, count)
 
 
 def read_message(data, offset=0, encoding='', encoding_errors='strict'):
@@ -275,15 +283,17 @@ def format_bundle(data, timetag=None, encoding='', encoding_errors='strict'):
     bundle = [pack('8s', b'#bundle\0')]
     bundle.append(TIME_TAG.pack(*timetag))
 
+    stats = Stats()
     for address, values in data:
-        msg = format_message(
+        msg, st = format_message(
             address, values, encoding='',
             encoding_errors=encoding_errors
         )
         bundle.append(pack('>i', len(msg)))
         bundle.append(msg)
+        stats += st
 
-    return b''.join(bundle)
+    return b''.join(bundle), stats
 
 
 def read_bundle(data, encoding='', encoding_errors='strict'):

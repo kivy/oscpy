@@ -8,9 +8,11 @@ to your requests and avoid repeating them in your code.
 """
 
 import socket
-from oscpy.parser import format_message, format_bundle
 from time import sleep
 from sys import platform
+
+from oscpy.parser import format_message, format_bundle
+from oscpy.stats import Stats
 
 SOCK = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -57,15 +59,17 @@ def send_message(
         address = ip_address
     else:
         address = (ip_address, port)
-    sock.sendto(
-        format_message(
-            osc_address, values, encoding=encoding,
-            encoding_errors=encoding_errors
-        ),
-        address
+
+    message, stats = format_message(
+        osc_address, values, encoding=encoding,
+        encoding_errors=encoding_errors
     )
+
+    sock.sendto(message, address)
     if safer:
         sleep(10e-9)
+
+    return stats
 
 
 def send_bundle(
@@ -92,15 +96,15 @@ def send_bundle(
     """
     if not sock:
         sock = SOCK
-    sock.sendto(
-        format_bundle(
-            messages, timetag=timetag, encoding=encoding,
-            encoding_errors=encoding_errors
-        ),
-        (ip_address, port),
+    bundle, stats = format_bundle(
+        messages, timetag=timetag, encoding=encoding,
+        encoding_errors=encoding_errors
     )
+    sock.sendto(bundle, (ip_address, port))
     if safer:
         sleep(10e-9)
+
+    return stats
 
 
 class OSCClient(object):
@@ -125,19 +129,24 @@ class OSCClient(object):
         self.sock = sock or SOCK
         self.encoding = encoding
         self.encoding_errors = encoding_errors
+        self.stats = Stats()
 
     def send_message(self, address, values, safer=False):
         """Wrap the module level `send_message` function."""
-        send_message(
+        stats = send_message(
             address, values, self.address, self.port, self.sock,
             safer=safer, encoding=self.encoding,
             encoding_errors=self.encoding_errors
         )
+        self.stats += stats
+        return stats
 
     def send_bundle(self, messages, timetag=None, safer=False):
         """Wrap the module level `send_bundle` function."""
-        send_bundle(
+        stats = send_bundle(
             messages, self.address, self.port, timetag=timetag,
             sock=self.sock, safer=safer, encoding=self.encoding,
             encoding_errors=self.encoding_errors
         )
+        self.stats += stats
+        return stats

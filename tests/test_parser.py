@@ -7,6 +7,7 @@ from oscpy.parser import (
 from pytest import approx, raises
 from time import time
 import struct
+from oscpy.stats import Stats
 
 # example messages from
 # http://opensoundcontrol.org/spec-1_0-examples#argument
@@ -135,7 +136,7 @@ def test_read_message():
 
 
 def test_read_message_wrong_address():
-    msg = format_message(b'test', [])
+    msg, stat = format_message(b'test', [])
     with raises(ValueError) as e:
         address, tags, values, size = read_message(msg)
 
@@ -179,7 +180,7 @@ def tests_format_message():
     for message in message_1, message_2:
         source, msg, result = message
         msg = struct.pack('>%iB' % len(msg), *msg)
-        assert format_message(*source) == msg
+        assert format_message(*source)[0] == msg
 
 
 def tests_format_message_null_terminated_address():
@@ -187,7 +188,7 @@ def tests_format_message_null_terminated_address():
         source, msg, result = message
         source = source[0] + b'\0', source[1]
         msg = struct.pack('>%iB' % len(msg), *msg)
-        assert format_message(*source) == msg
+        assert format_message(*source)[0] == msg
 
 
 def test_format_wrong_types():
@@ -196,7 +197,7 @@ def test_format_wrong_types():
 
 
 def test_format_bundle():
-    bundle = format_bundle((message_1[0], message_2[0]), timetag=None)
+    bundle, stats = format_bundle((message_1[0], message_2[0]), timetag=None)
 
     assert struct.pack('>%iB' % len(message_1[1]), *message_1[1]) in bundle
     assert struct.pack('>%iB' % len(message_2[1]), *message_2[1]) in bundle
@@ -207,6 +208,13 @@ def test_format_bundle():
     assert len(messages) == 2
     assert messages[0][::2] == message_1[2]
     assert messages[1][::2] == message_2[2]
+
+    assert stats.calls == 2
+    assert stats.bytes == 72
+    assert stats.params == 6
+    assert stats.types[b'f'] == 3
+    assert stats.types[b'i'] == 2
+    assert stats.types[b's'] == 1
 
 
 def test_timetag():
@@ -219,23 +227,23 @@ def test_timetag():
 def test_format_encoding():
     s = u'éééààà'
     with raises(TypeError):
-        read_message(format_message('/test', [s]))
+        read_message(format_message('/test', [s])[0])
 
-    assert read_message(format_message('/test', [s], encoding='utf8'))[2][0] == s.encode('utf8')  # noqa
-    assert read_message(format_message('/test', [s], encoding='utf8'), encoding='utf8')[2][0] == s  # noqa
+    assert read_message(format_message('/test', [s], encoding='utf8')[0])[2][0] == s.encode('utf8')  # noqa
+    assert read_message(format_message('/test', [s], encoding='utf8')[0], encoding='utf8')[2][0] == s  # noqa
 
     with raises(UnicodeEncodeError):
         format_message('/test', [s], encoding='ascii')  # noqa
 
     with raises(UnicodeDecodeError):
-        read_message(format_message('/test', [s], encoding='utf8'), encoding='ascii')  # noqa
+        read_message(format_message('/test', [s], encoding='utf8')[0], encoding='ascii')  # noqa
 
     assert read_message(
-        format_message('/test', [s], encoding='utf8'),
+        format_message('/test', [s], encoding='utf8')[0],
         encoding='ascii', encoding_errors='ignore'
     )[2][0] == ''
 
     assert read_message(
-        format_message('/test', [s], encoding='utf8'),
+        format_message('/test', [s], encoding='utf8')[0],
         encoding='ascii', encoding_errors='replace'
     )[2][0] == u'������������'
