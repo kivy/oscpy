@@ -48,11 +48,22 @@ class Stats(object):
         )
 
     def __repr__(self):
-        return str(
-            dict(
-                calls=self.calls,
-                bytes=self.bytes,
-                params=self.params,
-                types=self.types
+        return 'Stats:\n' + '\n'.join(
+            '    {}:{}{}'.format(
+                k,
+                '' if isinstance(v, str) and v.startswith('\n') else ' ',
+                v
+            )
+            for k, v in (
+                ('calls', self.calls),
+                ('bytes', self.bytes),
+                ('params', self.params),
+                (
+                    'types',
+                    ''.join(
+                        '\n        {}: {}'.format(k, self.types[k])
+                        for k in sorted(self.types)
+                    )
+                )
             )
         )
