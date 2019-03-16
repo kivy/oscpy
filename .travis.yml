@@ -38,8 +38,9 @@ matrix:
         - pytest tests/ --cov oscpy/ --cov-branch
         - travis_retry coveralls
 
-    - language: python
+    - language: sh
       os: osx
+      python: "2.7"
       install: pip install --editable .[dev,travis]
       script:
         - pytest tests/ --cov oscpy/ --cov-branch
