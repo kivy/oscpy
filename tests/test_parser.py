@@ -150,6 +150,14 @@ def test_read_broken_bundle():
         read_bundle(data)
 
 
+def test_read_broken_message():
+    # a message where ',' starting the list of tags has been replaced
+    # with \x00
+    s = b'/tmp\x00\x00\x00\x00\x00i\x00\x00\x00\x00\x00\x01'
+    with raises(ValueError):
+        read_message(s)
+
+
 def test_read_bundle():
     pad = padded(len('#bundle'))
     data = struct.pack('>%isQ' % pad, b'#bundle', 1)
@@ -194,6 +202,11 @@ def tests_format_message_null_terminated_address():
 def test_format_wrong_types():
     with raises(TypeError):
         format_message(b'/test', values=[u'test'])
+
+
+def test_format_unknown_type():
+    with raises(TypeError):
+        format_message(b'/test', values=[object])
 
 
 def test_format_bundle():
