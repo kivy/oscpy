@@ -11,13 +11,6 @@ matrix:
         - travis_retry coveralls
     - language: python
       os: linux
-      python: "3.4"
-      install: pip install --editable .[dev,travis]
-      script:
-        - pytest tests/ --cov oscpy/ --cov-branch
-        - travis_retry coveralls
-    - language: python
-      os: linux
       python: "3.5"
       install: pip install --editable .[dev,travis]
       script:
