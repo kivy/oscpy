@@ -39,6 +39,28 @@ matrix:
         - pytest tests/ --cov oscpy/ --cov-branch
         - travis_retry coveralls
 
+    - language: sh
+      os: osx
+      python: "3.5"
+      install: pip install --editable .[dev,travis]
+      script:
+        - pytest tests/ --cov oscpy/ --cov-branch
+        - travis_retry coveralls
+    - language: sh
+      os: osx
+      python: "3.6"
+      install: pip install --editable .[dev,travis]
+      script:
+        - pytest tests/ --cov oscpy/ --cov-branch
+        - travis_retry coveralls
+    - language: sh
+      os: osx
+      python: "3.7"
+      install: pip install --editable .[dev,travis]
+      script:
+        - pytest tests/ --cov oscpy/ --cov-branch
+        - travis_retry coveralls
+
     - language: python
       os: windows
       language: sh
@@ -55,8 +77,8 @@ matrix:
       python: "3.5"
       language: sh
       before_install:
-        - choco install python3
-        - export PATH="/c/Python37/:/c/Python37/Scripts:$PATH"
+        - choco install python3.5
+        - export PATH="/c/Python35/:/c/Python35/Scripts:$PATH"
       install: pip install --editable .[dev,travis]
       script:
         - pytest tests/ --cov oscpy/ --cov-branch
@@ -66,8 +88,8 @@ matrix:
       python: "3.6"
       language: sh
       before_install:
-        - choco install python3
-        - export PATH="/c/Python37/:/c/Python37/Scripts:$PATH"
+        - choco install python3.6
+        - export PATH="/c/Python36/:/c/Python36/Scripts:$PATH"
       install: pip install --editable .[dev,travis]
       script:
         - pytest tests/ --cov oscpy/ --cov-branch
