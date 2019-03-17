@@ -30,6 +30,13 @@ matrix:
       script:
         - pytest tests/ --cov oscpy/ --cov-branch
         - travis_retry coveralls
+    - language: python
+      os: linux
+      python: "pypy3.5"
+      install: pip install --editable .[dev,travis]
+      script:
+        - pytest tests/ --cov oscpy/ --cov-branch
+        - travis_retry coveralls
 
     - language: sh
       os: osx
