@@ -2,7 +2,8 @@
 
 from oscpy.parser import (
     parse, padded, read_message, read_bundle, read_packet,
-    format_message, format_bundle, timetag_to_time, time_to_timetag
+    format_message, format_bundle, timetag_to_time, time_to_timetag,
+    format_midi, MidiTuple
 )
 from pytest import approx, raises
 from time import time
@@ -112,6 +113,12 @@ def test_parse_blob():
     fmt = '>i%iQ' % pad
     s = struct.pack(fmt, length, *(data + (pad - length) * (0, )))
     result = parse(b'b', s)[0]
+    assert result == data
+
+
+def test_parse_midi():
+    data = MidiTuple(0, 144, 72, 64)
+    result = parse(b'm', struct.pack('>I', format_midi(data)))[0]
     assert result == data
 
 

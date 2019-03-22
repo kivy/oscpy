@@ -21,7 +21,7 @@ __all__ = (
 from struct import Struct, pack, unpack_from, calcsize
 from time import time
 import sys
-from collections import Counter
+from collections import Counter, namedtuple
 from oscpy.stats import Stats
 
 if sys.version_info.major > 2:  # pragma: no cover
@@ -42,6 +42,7 @@ NTP_DELTA = 2208988800
 
 NULL = b'\0'
 
+MidiTuple = namedtuple('MidiTuple', 'port_id status_byte data1 data2')
 
 def padded(l, n=4):
     """Return the size to pad a thing to.
@@ -94,11 +95,26 @@ def parse_blob(value, offset=0, **kwargs):
     return data, padded(length, 8)
 
 
+def parse_midi(value, offset=0, **kwargs):
+    """Return a MIDI tuple from offset in value.
+    A valid MIDI message: (port id, status byte, data1, data2).
+    """
+    val = unpack_from('>I', value, offset)[0]
+    args = tuple((val & 0xFF << 8 * i) >> 8 * i for i in range(3, -1, -1))
+    midi = MidiTuple(*args)
+    return midi, len(midi)
+
+
+def format_midi(value):
+    return sum((val & 0xFF) << 8 * (3 - pos) for pos, val in enumerate(value))
+
+
 PARSERS = {
     b'i': parse_int,
     b'f': parse_float,
     b's': parse_string,
     b'b': parse_blob,
+    b'm': parse_midi,
 }
 
 
@@ -114,6 +130,7 @@ WRITERS = (
     (bytes, (b's', b'%is')),
     (UNICODE, (b's', b'%is')),
     (bytearray, (b'b', b'%ib')),
+    (MidiTuple, (b'm', b'I')),
 )
 
 
@@ -205,6 +222,7 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
             (
                 encode_cache.get(v) + NULL if isinstance(v, UNICODE) and encoding
                 else (v + NULL) if t in (b's', b'b')
+                else format_midi(v) if isinstance(v, MidiTuple)
                 else v
             )
             for t, v in
