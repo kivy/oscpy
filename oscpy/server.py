@@ -288,6 +288,9 @@ class OSCThreadServer(object):
             s = self.default_socket
 
         if s in self.sockets:
+            read = select([s], [], [], 0)
+            if s in read:
+                s.recvfrom(65535)
             s.close()
             self.sockets.remove(s)
         else:
