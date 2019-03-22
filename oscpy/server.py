@@ -289,9 +289,9 @@ class OSCThreadServer(object):
 
         if s in self.sockets:
             read = select([s], [], [], 0)
+            s.close()
             if s in read:
                 s.recvfrom(65535)
-            s.close()
             self.sockets.remove(s)
         else:
             raise RuntimeError('{} is not one of my sockets!'.format(s))
@@ -325,11 +325,7 @@ class OSCThreadServer(object):
                     continue
 
             for sender_socket in read:
-                try:
-                    data, sender = sender_socket.recvfrom(65535)
-                except OSError:
-                    # socket was closed during recv?
-                    continue
+                data, sender = sender_socket.recvfrom(65535)
                 for address, tags, values, offset in read_packet(
                     data, drop_late=drop_late, encoding=self.encoding,
                     encoding_errors=self.encoding_errors
