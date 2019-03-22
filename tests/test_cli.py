@@ -1,4 +1,5 @@
 from textwrap import dedent
+from random import randint
 from time import sleep
 from oscpy.cli import init_parser, main, _send, __dump
 from oscpy.client import send_message
@@ -43,7 +44,7 @@ def test___dump(capsys):
     options = Mock()
     options.repeat = 2
     options.host = 'localhost'
-    options.port = 12345
+    options.port = randint(60000, 65535)
     options.address = b'/test'
     options.safer = False
     options.encoding = None
