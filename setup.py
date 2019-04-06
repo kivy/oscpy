@@ -20,6 +20,7 @@ setup(
     version=__version__,
     description='A modern and efficient OSC Client/Server implementation',
     long_description=long_description,
+    long_description_content_type='text/markdown',
     url=URL,
     author='Gabriel Pettier',
     author_email='gabriel@kivy.org',
