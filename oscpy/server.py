@@ -429,6 +429,24 @@ class OSCThreadServer(object):
         self.stats_sent += stats
         return stats
 
+    def get_sender(self):
+        """Return the socket, ip and port of the message that is currently being managed.
+        Warning::
+
+            this method should only be called from inside the handling
+            of a message (i.e, inside a callback).
+        """
+        frames = inspect.getouterframes(inspect.currentframe())
+        for frame, filename, _, function, _, _ in frames:
+            if function == '_listen' and __file__.startswith(filename):
+                break
+        else:
+            raise RuntimeError('get_sender() not called from a callback')
+
+        sock = frame.f_locals.get('sender_socket')
+        address, port = frame.f_locals.get('sender')
+        return sock, address, port
+
     def answer(
         self, address=None, values=None, bundle=None, timetag=None,
         safer=False, port=None
@@ -448,17 +466,11 @@ class OSCThreadServer(object):
         """
         if not values:
             values = []
-        frames = inspect.getouterframes(inspect.currentframe())
-        for frame, filename, line, function, lines, index in frames:
-            if function == '_listen' and __file__.startswith(filename):
-                break
-        else:
-            raise RuntimeError('answer() not called from a callback')
 
-        ip_address, response_port = frame.f_locals.get('sender')
+        sock, ip_address, response_port = self.get_sender()
+
         if port is not None:
             response_port = port
-        sock = frame.f_locals.get('sender_socket')
 
         if bundle:
             return self.send_bundle(
