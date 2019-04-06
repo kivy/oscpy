@@ -147,12 +147,21 @@ PARSERS = {
     b'i': parse_int,
     b'f': parse_float,
     b's': parse_string,
+    b'S': parse_string,
     b'b': parse_blob,
     b'm': parse_midi,
     b'T': parse_true,
     b'F': parse_false,
     b'N': parse_nil,
     b'I': parse_infinitum,
+    # TODO
+    # b'h': parse_long,
+    # b't': parse_timetage,
+    # b'd': parse_double,
+    # b'c': parse_char,
+    # b'r': parse_rgba,
+    # b'[': parse_array_start,
+    # b']': parse_array_end,
 }
 
 
