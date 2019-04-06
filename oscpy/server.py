@@ -391,7 +391,7 @@ class OSCThreadServer(object):
         elif not sock:
             raise RuntimeError('no default socket yet and no socket provided')
 
-        self.stats_sent += send_message(
+        stats = send_message(
             osc_address,
             values,
             ip_address,
@@ -401,6 +401,8 @@ class OSCThreadServer(object):
             encoding=self.encoding,
             encoding_errors=self.encoding_errors
         )
+        self.stats_sent += stats
+        return stats
 
     def send_bundle(
         self, messages, ip_address, port, timetag=None, sock=None, safer=False
@@ -415,7 +417,7 @@ class OSCThreadServer(object):
         elif not sock:
             raise RuntimeError('no default socket yet and no socket provided')
 
-        self.stats_sent += send_bundle(
+        stats = send_bundle(
             messages,
             ip_address,
             port,
@@ -424,6 +426,8 @@ class OSCThreadServer(object):
             encoding=self.encoding,
             encoding_errors=self.encoding_errors
         )
+        self.stats_sent += stats
+        return stats
 
     def answer(
         self, address=None, values=None, bundle=None, timetag=None,
@@ -457,12 +461,12 @@ class OSCThreadServer(object):
         sock = frame.f_locals.get('sender_socket')
 
         if bundle:
-            self.send_bundle(
+            return self.send_bundle(
                 bundle, ip_address, response_port, timetag=timetag, sock=sock,
                 safer=safer
             )
         else:
-            self.send_message(
+            return self.send_message(
                 address, values, ip_address, response_port, sock=sock
             )
 
