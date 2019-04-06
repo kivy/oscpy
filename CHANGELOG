@@ -1,3 +1,21 @@
+v0.4.0
+======
+
+Unicode support, servers and clients can declare an encoding for strings.
+Fix timeout bug after 15mn without any activity.
+Allow answering to a specific port.
+Allow callbacks to get the addresses they were called with.
+Add default_handler option for a server, to get all messages that didn't match any known address.
+Allow using default socket implicitly in OSCThreadServer.stop()
+Add statistics collections (messages/bytes sent/received)
+Add default routes to probe the server about existing routes and usage statistics.
+Improve reliability of stopping server.
+Add support for Midi messages
+Add support for True/False/Nil/Infinitum messages
+Add support for Symbol messages (treated as strings)
+Test/Coverage of more python versions and OSs in CI
+Improve documentation (README, CHANGELOG, and CONTRIBUTING)
+
 v0.3.0
 ======
 
