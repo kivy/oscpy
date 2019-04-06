@@ -41,6 +41,8 @@ TP_PACKET_FORMAT = "!12I"
 NTP_DELTA = 2208988800
 
 NULL = b'\0'
+EMPTY = tuple()
+INF = float('inf')
 
 MidiTuple = namedtuple('MidiTuple', 'port_id status_byte data1 data2')
 
@@ -109,12 +111,57 @@ def format_midi(value):
     return sum((val & 0xFF) << 8 * (3 - pos) for pos, val in enumerate(value))
 
 
+def parse_true(*args, **kwargs):
+    return True, 0
+
+
+def format_true(value):
+    return EMPTY
+
+
+def parse_false(*args, **kwargs):
+    return False, 0
+
+
+def format_false(value):
+    return EMPTY
+
+
+def parse_nil(*args, **kwargs):
+    return None, 0
+
+
+def format_nil(value):
+    return EMPTY
+
+
+def parse_infinitum(*args, **kwargs):
+    return INF, 0
+
+
+def format_infinitum(value):
+    return EMPTY
+
+
 PARSERS = {
     b'i': parse_int,
     b'f': parse_float,
     b's': parse_string,
+    b'S': parse_string,
     b'b': parse_blob,
     b'm': parse_midi,
+    b'T': parse_true,
+    b'F': parse_false,
+    b'N': parse_nil,
+    b'I': parse_infinitum,
+    # TODO
+    # b'h': parse_long,
+    # b't': parse_timetage,
+    # b'd': parse_double,
+    # b'c': parse_char,
+    # b'r': parse_rgba,
+    # b'[': parse_array_start,
+    # b']': parse_array_end,
 }
 
 
@@ -130,6 +177,9 @@ WRITERS = (
     (bytes, (b's', b'%is')),
     (UNICODE, (b's', b'%is')),
     (bytearray, (b'b', b'%ib')),
+    (True, (b'T', b'')),
+    (False, (b'F', b'')),
+    (None, (b'N', b'')),
     (MidiTuple, (b'm', b'I')),
 )
 
@@ -171,9 +221,13 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
 
     for value in values:
         lv += 1
-        cls, writer = None, None
-        for cls, writer in WRITERS:
-            if isinstance(value, cls):
+        cls_or_value, writer = None, None
+        for cls_or_value, writer in WRITERS:
+            if (
+                cls_or_value is value
+                or isinstance(cls_or_value, type)
+                and isinstance(value, cls_or_value)
+            ):
                 break
         else:
             raise TypeError(
@@ -181,11 +235,11 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
                 .format(value, [x[0] for x in WRITERS])
             )
 
-        if cls == UNICODE:
+        if cls_or_value == UNICODE:
             if not encoding:
                 raise TypeError(u"Can't format unicode string without encoding")
 
-            cls = bytes
+            cls_or_value = bytes
             value = (
                 encode_cache[value]
                 if value in encode_cache else
@@ -194,11 +248,11 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
                 )
             )
 
-        assert cls, writer
+        assert cls_or_value, writer
 
         tag, v_fmt = writer
         if b'%i' in v_fmt:
-            v_fmt = v_fmt % padded(len(value) + 1, PADSIZES[cls])
+            v_fmt = v_fmt % padded(len(value) + 1, PADSIZES[cls_or_value])
 
         tags.append(tag)
         fmt.append(v_fmt)

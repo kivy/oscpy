@@ -3,7 +3,7 @@
 from oscpy.parser import (
     parse, padded, read_message, read_bundle, read_packet,
     format_message, format_bundle, timetag_to_time, time_to_timetag,
-    format_midi, MidiTuple
+    format_midi, format_true, format_false, format_nil, format_infinitum, MidiTuple
 )
 from pytest import approx, raises
 from time import time
@@ -122,6 +122,26 @@ def test_parse_midi():
     assert result == data
 
 
+def test_parse_nil():
+    result = parse(b'N', '')[0]
+    assert result == None
+
+
+def test_parse_true():
+    result = parse(b'T', '')[0]
+    assert result == True
+
+
+def test_parse_false():
+    result = parse(b'F', '')[0]
+    assert result == False
+
+
+def test_parse_inf():
+    result = parse(b'I', '')[0]
+    assert result == float('inf')
+
+
 def test_parse_unknown():
     with raises(ValueError):
         parse(b'H', struct.pack('>f', 1.5))
@@ -204,6 +224,22 @@ def tests_format_message_null_terminated_address():
         source = source[0] + b'\0', source[1]
         msg = struct.pack('>%iB' % len(msg), *msg)
         assert format_message(*source)[0] == msg
+
+
+def test_format_true():
+    assert format_true(True) == tuple()
+
+
+def test_format_false():
+    assert format_false(False) == tuple()
+
+
+def test_format_nil():
+    assert format_nil(None) == tuple()
+
+
+def test_format_inf():
+    assert format_infinitum(float('inf')) == tuple()
 
 
 def test_format_wrong_types():
