@@ -193,6 +193,10 @@ class OSCThreadServer(object):
         elif not sock:
             raise RuntimeError('no default socket yet and no socket provided')
 
+        if isinstance(address, UNICODE) and self.encoding:
+            address = address.encode(
+                self.encoding, errors=self.encoding_errors)
+
         callbacks = self.addresses.get((sock, address), [])
         to_remove = []
         for cb in callbacks:

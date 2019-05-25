@@ -846,3 +846,34 @@ def test_get_routes():
         sleep(10e-9)
 
     assert u'/test_route' in values
+
+
+def test_get_sender():
+    osc = OSCThreadServer(encoding='utf8')
+    osc.listen(default=True)
+
+    values = []
+
+    @osc.address(u'/test_route')
+    def callback(*val):
+        values.append(osc.get_sender())
+
+    with pytest.raises(RuntimeError) as exc:
+        osc.get_sender()
+
+    assert 'get_sender() not called from a callback' in str(exc)
+
+    send_message(
+        b'/test_route',
+        [
+            osc.getaddress()[1]
+        ],
+        *osc.getaddress(),
+        encoding='utf8'
+    )
+
+    timeout = time() + 2
+    while not values:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
