@@ -164,10 +164,8 @@ def test_read_message():
 
 def test_read_message_wrong_address():
     msg, stat = format_message(b'test', [])
-    with raises(ValueError) as e:
+    with raises(ValueError, match="doesn't start with a '/'") as e:
         address, tags, values, size = read_message(msg)
-
-    assert "doesn't start with a '/'" in str(e)
 
 
 def test_read_broken_bundle():
