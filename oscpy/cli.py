@@ -3,7 +3,7 @@
 
 from argparse import ArgumentParser
 from time import sleep
-from sys import exit
+from sys import exit, stderr
 from ast import literal_eval
 
 from oscpy.client import send_message
@@ -70,6 +70,7 @@ def _dump(options): # pragma: no cover
 
 def init_parser():
     parser = ArgumentParser(description='OSCPy command line interface')
+    parser.set_defaults(func=lambda *x: parser.print_usage(stderr))
 
     subparser = parser.add_subparsers()
 
