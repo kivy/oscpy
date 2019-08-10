@@ -859,10 +859,9 @@ def test_get_sender():
     def callback(*val):
         values.append(osc.get_sender())
 
-    with pytest.raises(RuntimeError) as exc:
+    with pytest.raises(RuntimeError,
+                       match='get_sender\(\) not called from a callback'):
         osc.get_sender()
-
-    assert 'get_sender() not called from a callback' in str(exc)
 
     send_message(
         b'/test_route',
