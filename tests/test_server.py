@@ -26,6 +26,7 @@ def test_getaddress():
     osc = OSCThreadServer()
     sock = osc.listen()
     assert osc.getaddress(sock)[0] == '127.0.0.1'
+
     with pytest.raises(RuntimeError):
         osc.getaddress()
 
