@@ -42,6 +42,9 @@ def ServerClass(cls):
     return cls
 
 
+__FILE__ = inspect.getfile(ServerClass)
+
+
 class OSCThreadServer(object):
     """A thread-based OSC server.
 
@@ -192,6 +195,10 @@ class OSCThreadServer(object):
             sock = self.default_socket
         elif not sock:
             raise RuntimeError('no default socket yet and no socket provided')
+
+        if isinstance(address, UNICODE) and self.encoding:
+            address = address.encode(
+                self.encoding, errors=self.encoding_errors)
 
         callbacks = self.addresses.get((sock, address), [])
         to_remove = []
@@ -438,7 +445,7 @@ class OSCThreadServer(object):
         """
         frames = inspect.getouterframes(inspect.currentframe())
         for frame, filename, _, function, _, _ in frames:
-            if function == '_listen' and __file__.startswith(filename):
+            if function == '_listen' and __FILE__.startswith(filename):
                 break
         else:
             raise RuntimeError('get_sender() not called from a callback')
