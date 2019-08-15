@@ -1,13 +1,22 @@
 on: push
 name: on push
 jobs:
-  testsLinux37:
+  TestsLinux37:
     name: run tests on linux, python3.7
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@master
     - name: install
-      uses: docker/python:37
-      with:
-        entrypoint: pip
-        args: install .[dev]
+      run: pip install .[dev]
+    - name: test
+      run: pytest
+
+  TestsWindows37:
+    name: run tests on windows, python3.7
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: install
+      run: pip install .[dev]
+    - name: test
+      run: pytest
