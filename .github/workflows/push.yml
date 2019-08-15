@@ -7,13 +7,15 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - name: prepare
-      run: pip install -U setuptools wheel
+      run: pip3.7 install -U setuptools wheel
     - name: install
-      run: pip install .[dev,travis]
+      run: pip3.7 install .[dev,travis]
     - name: test
-      run: python -m pytest tests/ --cov oscpy/ --cov-branch
+      run: python3.7 -m pytest tests/ --cov oscpy/ --cov-branch
     - name: coveralls
       run: python -m coveralls
+      env: # Or as an environment variable
+        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
 
   TestsWindows37:
     name: run tests on windows, python3.7
@@ -21,9 +23,9 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - name: install
-      run: pip install .[dev]
+      run: pip3.7 install .[dev]
     - name: test
-      run: pytest tests/
+      run: python3.7 -m pytest tests/
 
   TestsMacOs27:
     name: run tests on osx, python2.7
