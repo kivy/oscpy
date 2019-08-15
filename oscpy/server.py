@@ -307,6 +307,7 @@ class OSCThreadServer(object):
         """Call stop on all the existing sockets."""
         for s in self.sockets[:]:
             self.stop(s)
+        sleep(10e-9)
 
     def _listen(self):
         """(internal) Busy loop to listen for events.
