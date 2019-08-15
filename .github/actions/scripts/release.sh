@@ -6,7 +6,7 @@ if [[ "refs/tags/$(git tag | grep v | tail -n 1)" = $GITHUB_REF ]]; then
     python setup.py sdist bdist_wheel
     python -m twine check dist/*
   if [[ $GITHUB_REF =~ -test$ ]]; then
-    python -m twine upload -u oscpy --disable-progress-bar --repository-url https://test.pypi.org/legacy/ dist/*
+    python -m twine upload -u oscpy -p $TWINE_PASSWORD_TEST --disable-progress-bar --repository-url https://test.pypi.org/legacy/ dist/*
   else
     echo "OOF this would have uploaded"
     # python -m twine upload -u oscpy --disable-progress-bar dist/*
