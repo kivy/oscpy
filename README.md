@@ -1,7 +1,8 @@
 ### OSCPy
 
 [![Coverage Status](https://coveralls.io/repos/github/kivy/oscpy/badge.svg?branch=master)](https://coveralls.io/github/kivy/oscpy?branch=master)
-[![Build Status](https://travis-ci.org/kivy/oscpy.svg?branch=master)](https://travis-ci.org/kivy/oscpy)
+CI is done by Github Checks, see the current commit for build status.
+
 
 A modern implementation of OSC for python2/3.
 
