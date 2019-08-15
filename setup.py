@@ -45,7 +45,7 @@ setup(
     install_requires=[],
     extras_require={
         'dev': ['pytest>=3.6', 'wheel', 'pytest-cov', 'pycodestyle'],
-        'travis': ['coveralls'],
+        'ci': ['coveralls', 'pytest-rerunfailures'],
     },
     package_data={},
     data_files=[],
