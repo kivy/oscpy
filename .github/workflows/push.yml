@@ -24,7 +24,7 @@ jobs:
       run: python -m pytest --reruns 5 tests/ --cov oscpy/ --cov-branch
     - name: coveralls
       run: python -m coveralls
-      env: # Or as an environment variable
+      env:
         COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
 
   TestsPyPy:
@@ -44,7 +44,7 @@ jobs:
       run: python -m pytest --reruns 5 tests/ --cov oscpy/ --cov-branch
     - name: coveralls
       run: python -m coveralls
-      env: # Or as an environment variable
+      env:
         COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
 
   TestsMacOs:
@@ -60,5 +60,5 @@ jobs:
       run: python -m pytest --reruns 5 tests/ --cov oscpy/ --cov-branch
     - name: coveralls
       run: python -m coveralls
-      env: # Or as an environment variable
+      env:
         COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
