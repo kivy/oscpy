@@ -1,0 +1,16 @@
+on: push
+name: on push
+jobs:
+  Release:
+    name: base
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: prepare
+      run: pip install -U setuptools wheel twine
+    - name: build
+      run: python setup.py sdist bdist_wheel
+    - name: check
+      run: twine check dist/*
+    - name: upload
+      run: twine upload dist/*
