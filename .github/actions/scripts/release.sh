@@ -9,7 +9,6 @@ if [[ "refs/tags/$(git tag | grep v | tail -n 1)" = $GITHUB_REF ]]; then
     TWINE_PASSWORD=$TWINE_PASSWORD_TEST
     python -m twine upload -u oscpy --disable-progress-bar --repository-url https://test.pypi.org/legacy/ dist/*
   else
-    echo "OOF this would have uploaded"
-    # python -m twine upload -u oscpy --disable-progress-bar dist/*
+    python -m twine upload -u oscpy --disable-progress-bar dist/*
   fi
 fi
