@@ -11,7 +11,7 @@ jobs:
     - name: install
       run: pip install .[dev]
     - name: test
-      run: pytest tests/ --cov oscpy/ --cov-branch
+      run: python -m pytest tests/ --cov oscpy/ --cov-branch
     - name: coveralls
       run: coveralls
 
