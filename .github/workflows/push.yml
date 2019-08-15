@@ -7,9 +7,9 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - name: prepare
-      run: pip install -U setuptools wheel coveralls
+      run: pip install -U setuptools wheel
     - name: install
-      run: pip install .[dev]
+      run: pip install .[dev,travis]
     - name: test
       run: python -m pytest tests/ --cov oscpy/ --cov-branch
     - name: coveralls
