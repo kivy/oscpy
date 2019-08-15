@@ -13,4 +13,6 @@ jobs:
     - name: check
       run: twine check dist/*
     - name: upload
-      run: twine upload dist/*
+      run: twine upload --disable-progress-bar dist/*
+      env: # Or as an environment variable
+        TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
