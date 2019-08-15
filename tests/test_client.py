@@ -191,7 +191,7 @@ def test_encoding_errors_ignore():
     send_message(
         u'/encoded',
         [u'ééééé ààààà'],
-        '0.0.0.0', 9000,
+        'localhost', 9000,
         encoding='ascii',
         encoding_errors='ignore'
     )
@@ -201,7 +201,7 @@ def test_encoding_errors_replace():
     send_message(
         u'/encoded',
         [u'ééééé ààààà'],
-        '0.0.0.0', 9000,
+        'localhost', 9000,
         encoding='ascii',
         encoding_errors='replace'
     )

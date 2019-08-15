@@ -5,16 +5,19 @@ This module currently only implements `OSCThreadServer`, a thread based server.
 
 from threading import Thread
 
-from select import select
-import socket
-import inspect
-from time import sleep
 import os
 import re
+import inspect
 from sys import platform
+from time import sleep, time
+from functools import partial
+from select import select
+import socket
 
+from oscpy import __version__
 from oscpy.parser import read_packet, UNICODE
 from oscpy.client import send_bundle, send_message
+from oscpy.stats import Stats
 
 
 def ServerClass(cls):
@@ -32,11 +35,14 @@ def ServerClass(cls):
         for m in dir(self):
             meth = getattr(self, m)
             if hasattr(meth, '_address'):
-                server, address, sock = meth._address
-                server.bind(address, meth, sock)
+                server, address, sock, get_address = meth._address
+                server.bind(address, meth, sock, get_address=get_address)
 
     cls.__init__ = __init__
     return cls
+
+
+__FILE__ = inspect.getfile(ServerClass)
 
 
 class OSCThreadServer(object):
@@ -44,11 +50,14 @@ class OSCThreadServer(object):
 
     Listens for osc messages in a thread, and dispatches the messages
     values to callbacks from there.
+
+    The '/_oscpy/' namespace is reserved for metadata about the OSCPy
+    internals, please see package documentation for further details.
     """
 
     def __init__(
         self, drop_late_bundles=False, timeout=0.01, advanced_matching=False,
-        encoding='', encoding_errors='strict'
+        encoding='', encoding_errors='strict', default_handler=None
     ):
         """Create an OSCThreadServer.
 
@@ -68,6 +77,9 @@ class OSCThreadServer(object):
           to callback functions.
         - `encoding_errors` if `encoding` is set, this value will be
           used as `errors` parameter in encode/decode calls.
+        - `default_handler` if defined, will be used to handle any
+          message that no configured address matched, the received
+          arguments will be (address, *values).
         """
         self.addresses = {}
         self.sockets = []
@@ -77,6 +89,11 @@ class OSCThreadServer(object):
         self.advanced_matching = advanced_matching
         self.encoding = encoding
         self.encoding_errors = encoding_errors
+        self.default_handler = default_handler
+
+        self.stats_received = Stats()
+        self.stats_sent = Stats()
+
         t = Thread(target=self._listen)
         t.daemon = True
         t.start()
@@ -84,7 +101,7 @@ class OSCThreadServer(object):
         self._smart_address_cache = {}
         self._smart_part_cache = {}
 
-    def bind(self, address, callback, sock=None):
+    def bind(self, address, callback, sock=None, get_address=False):
         """Bind a callback to an osc address.
 
         A socket in the list of existing sockets of the server can be
@@ -107,8 +124,9 @@ class OSCThreadServer(object):
             address = self.create_smart_address(address)
 
         callbacks = self.addresses.get((sock, address), [])
-        if callback not in callbacks:
-            callbacks.append(callback)
+        cb = (callback, get_address)
+        if cb not in callbacks:
+            callbacks.append(cb)
         self.addresses[(sock, address)] = callbacks
 
     def create_smart_address(self, address):
@@ -178,9 +196,19 @@ class OSCThreadServer(object):
         elif not sock:
             raise RuntimeError('no default socket yet and no socket provided')
 
+        if isinstance(address, UNICODE) and self.encoding:
+            address = address.encode(
+                self.encoding, errors=self.encoding_errors)
+
         callbacks = self.addresses.get((sock, address), [])
-        while callback in callbacks:
-            callbacks.remove(callback)
+        to_remove = []
+        for cb in callbacks:
+            if cb[0] == callback:
+                to_remove.append(cb)
+
+        while to_remove:
+            callbacks.remove(to_remove.pop())
+
         self.addresses[(sock, address)] = callbacks
 
     def listen(
@@ -224,6 +252,7 @@ class OSCThreadServer(object):
                 'Only one default socket authorized! Please set '
                 'default=False to other calls to listen()'
             )
+        self.bind_meta_routes(sock)
         return sock
 
     def close(self, sock=None):
@@ -256,10 +285,20 @@ class OSCThreadServer(object):
 
         return sock.getsockname()
 
-    def stop(self, s):
-        """Close and remove a socket from the server's sockets."""
+    def stop(self, s=None):
+        """Close and remove a socket from the server's sockets.
+
+        If `sock` is None, uses the default socket for the server.
+
+        """
+        if not s and self.default_socket:
+            s = self.default_socket
+
         if s in self.sockets:
+            read = select([s], [], [], 0)
             s.close()
+            if s in read:
+                s.recvfrom(65535)
             self.sockets.remove(s)
         else:
             raise RuntimeError('{} is not one of my sockets!'.format(s))
@@ -279,6 +318,7 @@ class OSCThreadServer(object):
         match = self._match_address
         advanced_matching = self.advanced_matching
         addresses = self.addresses
+        stats = self.stats_received
 
         while True:
             drop_late = self.drop_late_bundles
@@ -286,23 +326,47 @@ class OSCThreadServer(object):
                 sleep(.01)
                 continue
             else:
-                read, write, error = select(self.sockets, [], [], self.timeout)
+                try:
+                    read, write, error = select(self.sockets, [], [], self.timeout)
+                except (ValueError, socket.error):
+                    continue
 
             for sender_socket in read:
                 data, sender = sender_socket.recvfrom(65535)
-                for address, types, values, offset in read_packet(
+                for address, tags, values, offset in read_packet(
                     data, drop_late=drop_late, encoding=self.encoding,
                     encoding_errors=self.encoding_errors
                 ):
+                    stats.calls += 1
+                    stats.bytes += offset
+                    stats.params += len(values)
+                    stats.types.update(tags)
+
+                    matched = False
                     if advanced_matching:
                         for sock, addr in addresses:
                             if sock == sender_socket and match(addr, address):
-                                for cb in addresses[(sock, addr)]:
-                                    cb(*values)
+                                matched = True
+                                for cb, get_address in addresses[(sock, addr)]:
+                                    if get_address:
+                                        cb(address, *values)
+                                    else:
+                                        cb(*values)
 
                     else:
-                        for cb in addresses.get((sender_socket, address), []):
-                            cb(*values)
+                        if (sender_socket, address) in addresses:
+                            matched = True
+
+                        for cb, get_address in addresses.get(
+                            (sender_socket, address), []
+                        ):
+                            if get_address:
+                                cb(address, *values)
+                            else:
+                                cb(*values)
+
+                    if not matched and self.default_handler:
+                        self.default_handler(address, *values)
 
     @staticmethod
     def _match_address(smart_address, target_address):
@@ -334,8 +398,18 @@ class OSCThreadServer(object):
         elif not sock:
             raise RuntimeError('no default socket yet and no socket provided')
 
-        send_message(
-            osc_address, values, ip_address, port, sock=sock, safer=safer)
+        stats = send_message(
+            osc_address,
+            values,
+            ip_address,
+            port,
+            sock=sock,
+            safer=safer,
+            encoding=self.encoding,
+            encoding_errors=self.encoding_errors
+        )
+        self.stats_sent += stats
+        return stats
 
     def send_bundle(
         self, messages, ip_address, port, timetag=None, sock=None, safer=False
@@ -350,7 +424,35 @@ class OSCThreadServer(object):
         elif not sock:
             raise RuntimeError('no default socket yet and no socket provided')
 
-        send_bundle(messages, ip_address, port, sock=sock, safer=safer)
+        stats = send_bundle(
+            messages,
+            ip_address,
+            port,
+            sock=sock,
+            safer=safer,
+            encoding=self.encoding,
+            encoding_errors=self.encoding_errors
+        )
+        self.stats_sent += stats
+        return stats
+
+    def get_sender(self):
+        """Return the socket, ip and port of the message that is currently being managed.
+        Warning::
+
+            this method should only be called from inside the handling
+            of a message (i.e, inside a callback).
+        """
+        frames = inspect.getouterframes(inspect.currentframe())
+        for frame, filename, _, function, _, _ in frames:
+            if function == '_listen' and __FILE__.startswith(filename):
+                break
+        else:
+            raise RuntimeError('get_sender() not called from a callback')
+
+        sock = frame.f_locals.get('sender_socket')
+        address, port = frame.f_locals.get('sender')
+        return sock, address, port
 
     def answer(
         self, address=None, values=None, bundle=None, timetag=None,
@@ -371,32 +473,29 @@ class OSCThreadServer(object):
         """
         if not values:
             values = []
-        frames = inspect.getouterframes(inspect.currentframe())
-        for frame, filename, line, function, lines, index in frames:
-            if function == '_listen' and __file__.startswith(filename):
-                break
-        else:
-            raise RuntimeError('answer() not called from a callback')
 
-        ip_address, response_port = frame.f_locals.get('sender')
+        sock, ip_address, response_port = self.get_sender()
+
         if port is not None:
             response_port = port
-        sock = frame.f_locals.get('sender_socket')
 
         if bundle:
-            self.send_bundle(
+            return self.send_bundle(
                 bundle, ip_address, response_port, timetag=timetag, sock=sock,
                 safer=safer
             )
         else:
-            self.send_message(
+            return self.send_message(
                 address, values, ip_address, response_port, sock=sock
             )
 
-    def address(self, address, sock=None):
+    def address(self, address, sock=None, get_address=False):
         """Decorate functions to bind them from their definition.
 
         `address` is the osc address to bind to the callback.
+        if `get_address` is set to True, the first parameter the
+        callback will receive will be the address that matched (useful
+        with advanced matching).
 
         example:
             server = OSCThreadServer()
@@ -415,17 +514,19 @@ class OSCThreadServer(object):
             To bind a method use the `address_method` decorator.
         """
         def decorator(callback):
-            self.bind(address, callback, sock)
+            self.bind(address, callback, sock, get_address=get_address)
             return callback
 
         return decorator
 
-    def address_method(self, address, sock=None):
+    def address_method(self, address, sock=None, get_address=False):
         """Decorate methods to bind them from their definition.
 
         The class defining the method must itself be decorated with the
         `ServerClass` decorator, the methods will be bound to the
         address when the class is instantiated.
+
+        See `address` for more information about the parameters.
 
         example:
 
@@ -436,11 +537,60 @@ class OSCThreadServer(object):
             class MyServer(object):
 
                 @osc.address_method(b'/test')
-                def success(*args):
+                def success(self, *args):
                     print("success!", args)
         """
         def decorator(decorated):
-            decorated._address = (self, address, sock)
+            decorated._address = (self, address, sock, get_address)
             return decorated
 
         return decorator
+
+    def bind_meta_routes(self, sock=None):
+        """This module implements osc routes to probe the internal state of a
+        live OSCPy server. These routes are placed in the /_oscpy/ namespace,
+        and provide information such as the version, the existing routes, and
+        usage statistics of the server over time.
+
+        These requests will be sent back to the client's address/port that sent
+        them, with the osc address suffixed with '/answer'.
+
+        examples:
+            '/_oscpy/version' -> '/_oscpy/version/answer'
+            '/_oscpy/stats/received' -> '/_oscpy/stats/received/answer'
+
+        messages to these routes require a port number as argument, to
+        know to which port to send to.
+        """
+        self.bind(b'/_oscpy/version', self._get_version, sock=sock)
+        self.bind(b'/_oscpy/routes', self._get_routes, sock=sock)
+        self.bind(b'/_oscpy/stats/received', self._get_stats_received, sock=sock)
+        self.bind(b'/_oscpy/stats/sent', self._get_stats_sent, sock=sock)
+
+    def _get_version(self, port, *args):
+        self.answer(
+            b'/_oscpy/version/answer',
+            (__version__, ),
+            port=port
+        )
+
+    def _get_routes(self, port, *args):
+        self.answer(
+            b'/_oscpy/routes/answer',
+            [a[1] for a in self.addresses],
+            port=port
+        )
+
+    def _get_stats_received(self, port, *args):
+        self.answer(
+            b'/_oscpy/stats/received/answer',
+            self.stats_received.to_tuple(),
+            port=port
+        )
+
+    def _get_stats_sent(self, port, *args):
+        self.answer(
+            b'/_oscpy/stats/sent/answer',
+            self.stats_sent.to_tuple(),
+            port=port
+        )

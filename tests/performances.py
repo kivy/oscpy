@@ -31,7 +31,7 @@ for i, pattern in enumerate(patterns):
 
     while time() < timeout:
         n += 1
-        p = format_message(b'/address', [b'test', 1, 1.2345])
+        p, s = format_message(b'/address', pattern)
 
     size = len(p) / 1000
     print(
@@ -48,6 +48,19 @@ for i, pattern in enumerate(patterns):
 
     print(
         f"parsed message {n} times ({n / DURATION}/s) "
+        f"({n * size / DURATION:.2f}MB/s)"
+    )
+
+
+    n = 0
+    timeout = time() + DURATION
+
+    while time() < timeout:
+        n += 1
+        read_message(format_message(b'/address', pattern)[0])
+
+    print(
+        f"round-trip {n} times ({n / DURATION}/s) "
         f"({n * size / DURATION:.2f}MB/s)"
     )
 
@@ -91,7 +104,7 @@ for family in 'unix', 'inet':
                 sent += 1
             sleep(10e-9)
 
-            size = len(format_message(b'/count', pattern)) / 1000.
+            size = len(format_message(b'/count', pattern)[0]) / 1000.
 
             print(
                 f"{i}: safe: {safer}\t",

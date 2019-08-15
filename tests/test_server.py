@@ -9,6 +9,7 @@ from os import unlink
 
 from oscpy.server import OSCThreadServer, ServerClass
 from oscpy.client import send_message, send_bundle
+from oscpy import __version__
 
 
 def test_instance():
@@ -25,6 +26,7 @@ def test_getaddress():
     osc = OSCThreadServer()
     sock = osc.listen()
     assert osc.getaddress(sock)[0] == '127.0.0.1'
+
     with pytest.raises(RuntimeError):
         osc.getaddress()
 
@@ -66,13 +68,25 @@ def test_stop_unknown():
         osc.stop(socket.socket())
 
 
-def test_stop_all():
+def test_stop_default():
     osc = OSCThreadServer()
     osc.listen(default=True)
+    assert len(osc.sockets) == 1
+    osc.stop()
+    assert len(osc.sockets) == 0
+
+
+def test_stop_all():
+    osc = OSCThreadServer()
+    sock = osc.listen(default=True)
+    host, port = sock.getsockname()
     osc.listen()
     assert len(osc.sockets) == 2
     osc.stop_all()
     assert len(osc.sockets) == 0
+    osc.listen(address=host, port=port)
+    assert len(osc.sockets) == 1
+    osc.stop_all()
 
 
 def test_send_message_without_socket():
@@ -107,6 +121,46 @@ def test_bind():
     osc.bind(b'/success', success, sock)
 
     send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port)
+
+    timeout = time() + 5
+    while not cont:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+
+
+def test_bind_get_address():
+    osc = OSCThreadServer()
+    sock = osc.listen()
+    port = sock.getsockname()[1]
+    cont = []
+
+    def success(address, *values):
+        assert address == b'/success'
+        cont.append(True)
+
+    osc.bind(b'/success', success, sock, get_address=True)
+
+    send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port)
+
+    timeout = time() + 5
+    while not cont:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+
+
+def test_bind_get_address_smart():
+    osc = OSCThreadServer(advanced_matching=True)
+    sock = osc.listen()
+    port = sock.getsockname()[1]
+    cont = []
+
+    def success(address, *values):
+        assert address == b'/success/a'
+        cont.append(True)
+
+    osc.bind(b'/success/?', success, sock, get_address=True)
+
+    send_message(b'/success/a', [b'test', 1, 1.12345], 'localhost', port)
 
     timeout = time() + 5
     while not cont:
@@ -610,7 +664,7 @@ def test_socket_family():
         assert osc.listen(address=filename, family='unix').family == socket.AF_UNIX  # noqa
 
     else:
-        with pytest.raises(NameError) as e_info:
+        with pytest.raises(AttributeError) as e_info:
             osc.listen(address=filename, family='unix')
 
     if exists(filename):
@@ -687,6 +741,136 @@ def test_encoding_send_receive():
         u'/encoded',
         ['hello world', u'ééééé ààààà'],
         *osc.getaddress(), encoding='utf8')
+
+    timeout = time() + 2
+    while not values:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
+
+
+def test_default_handler():
+    results = []
+
+    def test(address, *values):
+        results.append((address, values))
+
+    osc = OSCThreadServer(default_handler=test)
+    osc.listen(default=True)
+
+    @osc.address(b'/passthrough')
+    def passthrough(*values):
+        pass
+
+    osc.send_bundle(
+        (
+            (b'/test', []),
+            (b'/passthrough', []),
+            (b'/test/2', [1, 2, 3]),
+        ),
+        *osc.getaddress()
+    )
+
+    timeout = time() + 2
+    while len(results) < 2:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
+
+    expected = (
+        (b'/test', tuple()),
+        (b'/test/2', (1, 2, 3)),
+    )
+
+    for e, r in zip(expected, results):
+        assert e == r
+
+
+def test_get_version():
+    osc = OSCThreadServer(encoding='utf8')
+    osc.listen(default=True)
+
+    values = []
+
+    @osc.address(u'/_oscpy/version/answer')
+    def cb(val):
+        print(val)
+        values.append(val)
+
+    send_message(
+        b'/_oscpy/version',
+        [
+            osc.getaddress()[1]
+        ],
+        *osc.getaddress(),
+        encoding='utf8',
+        encoding_errors='strict'
+    )
+
+    timeout = time() + 2
+    while not values:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
+
+    assert __version__ in values
+
+
+def test_get_routes():
+    osc = OSCThreadServer(encoding='utf8')
+    osc.listen(default=True)
+
+    values = []
+
+    @osc.address(u'/test_route')
+    def dummy(*val):
+        pass
+
+    @osc.address(u'/_oscpy/routes/answer')
+    def cb(*routes):
+        values.extend(routes)
+
+    send_message(
+        b'/_oscpy/routes',
+        [
+            osc.getaddress()[1]
+        ],
+        *osc.getaddress(),
+        encoding='utf8',
+        encoding_errors='strict'
+    )
+
+    timeout = time() + 2
+    while not values:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
+
+    assert u'/test_route' in values
+
+
+def test_get_sender():
+    osc = OSCThreadServer(encoding='utf8')
+    osc.listen(default=True)
+
+    values = []
+
+    @osc.address(u'/test_route')
+    def callback(*val):
+        values.append(osc.get_sender())
+
+    with pytest.raises(RuntimeError,
+                       match='get_sender\(\) not called from a callback'):
+        osc.get_sender()
+
+    send_message(
+        b'/test_route',
+        [
+            osc.getaddress()[1]
+        ],
+        *osc.getaddress(),
+        encoding='utf8'
+    )
 
     timeout = time() + 2
     while not values:
