@@ -84,6 +84,7 @@ def test_stop_all():
     assert len(osc.sockets) == 2
     osc.stop_all()
     assert len(osc.sockets) == 0
+    sleep(.1)
     osc.listen(address=host, port=port)
     assert len(osc.sockets) == 1
     osc.stop_all()
