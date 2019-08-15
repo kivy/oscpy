@@ -1,0 +1,12 @@
+on: push
+name: on push
+jobs:
+  Release:
+    name: base
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: release
+      run: .github/actions/scripts/release.sh
+      env:
+        TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
