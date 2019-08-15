@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -ex
 
 if [[ $(git tag | grep v | tail -n 1) = $GITHUB_REF ]]; then
     pip install -U setuptools wheel twine
