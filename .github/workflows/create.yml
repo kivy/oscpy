@@ -1,5 +1,5 @@
-on: push
-name: on push
+on: create
+name: on create
 jobs:
   Release:
     name: base
