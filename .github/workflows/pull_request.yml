@@ -6,16 +6,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@master
+    - name: prepare
+      run: pip install -U setuptools wheel coveralls
     - name: install
       run: pip install .[dev]
     - name: test
-      run: pytest tests/ --cov oscpy/ --cov-branch
+      run: python -m pytest tests/ --cov oscpy/ --cov-branch
     - name: coveralls
       run: coveralls
 
   TestsWindows37:
     name: run tests on windows, python3.7
     runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: install
+      run: pip install .[dev]
+    - name: test
+      run: pytest tests/
+
+  TestsMacOs27:
+    name: run tests on osx, python2.7
+    runs-on: macOS-latest
     steps:
     - uses: actions/checkout@master
     - name: install

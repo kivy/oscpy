@@ -15,10 +15,19 @@ jobs:
     - name: coveralls
       run: coveralls
 
-
   TestsWindows37:
     name: run tests on windows, python3.7
     runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: install
+      run: pip install .[dev]
+    - name: test
+      run: pytest tests/
+
+  TestsMacOs27:
+    name: run tests on osx, python2.7
+    runs-on: macOS-latest
     steps:
     - uses: actions/checkout@master
     - name: install
