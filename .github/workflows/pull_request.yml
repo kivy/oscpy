@@ -9,7 +9,9 @@ jobs:
     - name: install
       run: pip install .[dev]
     - name: test
-      run: pytest
+      run: pytest tests/ --cov oscpy/ --cov-branch
+    - name: coveralls
+      run: coveralls
 
   TestsWindows37:
     name: run tests on windows, python3.7
