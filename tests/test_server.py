@@ -878,3 +878,19 @@ def test_get_sender():
         if time() > timeout:
             raise OSError('timeout while waiting for success message.')
         sleep(10e-9)
+
+
+def test_listen_and_send():
+
+    def callback(*values):
+        print("foreground got values: {}".format(values[0]))
+
+    osc = OSCThreadServer(encoding = 'utf8')
+    sock = osc.listen(address='0.0.0.0', port=3000, default=True)
+    osc.bind(b'/foreground_listening', callback)
+
+    osc.send_message(b'/background_listening', ["calling background!"],
+    ip_address = '127.0.0.1', port = 3001)
+
+    sleep(1)
+    osc.stop()
