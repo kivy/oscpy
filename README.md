@@ -48,7 +48,7 @@ Server (thread)
 from oscpy.server import OSCThreadServer
 from time import sleep
 
-def callback(values):
+def callback(*values):
     print("got values: {}".format(values))
 
 osc = OSCThreadServer()
@@ -70,7 +70,7 @@ osc = OSCThreadServer()
 sock = osc.listen(address='0.0.0.0', port=8000, default=True)
 
 @osc.address(b'/address')
-def callback(values):
+def callback(*values):
     print("got values: {}".format(values))
 
 sleep(1000)
