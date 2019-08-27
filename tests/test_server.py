@@ -8,7 +8,7 @@ from os.path import exists
 from os import unlink
 
 from oscpy.server import OSCThreadServer, ServerClass
-from oscpy.client import send_message, send_bundle
+from oscpy.client import send_message, send_bundle, OSCClient
 from oscpy import __version__
 
 
@@ -878,3 +878,52 @@ def test_get_sender():
         if time() > timeout:
             raise OSError('timeout while waiting for success message.')
         sleep(10e-9)
+
+
+def test_server_different_port():
+    # used for storing values received by callback_3000
+    checklist = []
+
+    def callback_3000(*values):
+        checklist.append(values[0])
+
+    # server, will be tested:
+    server_3000 = OSCThreadServer(encoding='utf8')
+    sock_3000 = server_3000.listen( address='0.0.0.0', port=3000, default=True)
+    server_3000.bind(b'/callback_3000', callback_3000)
+
+    # clients sending to different ports, used to test the server:
+    client_3000 = OSCClient(address='localhost', port=3000, encoding='utf8')
+
+    # server sends message to himself, should work:
+    server_3000.send_message(
+        b'/callback_3000',
+        ["a"],
+        ip_address='localhost',
+        port=3000
+    )
+    sleep(0.05)
+
+    # client sends message to server, will be received properly:
+    client_3000.send_message(b'/callback_3000', ["b"])
+    sleep(0.05)
+
+    # sever sends message on different port, might crash the server on windows:
+    server_3000.send_message(
+        b'/callback_3000',
+        ["nobody is going to receive this"],
+        ip_address='localhost',
+        port=3001
+    )
+    sleep(0.05)
+
+    # client sends message to server again. if server is dead, message
+    # will not be received:
+    client_3000.send_message(b'/callback_3000', ["c"])
+    sleep(0.1)
+
+    # if 'c' is missing in the received checklist, the server thread
+    # crashed and could not recieve the last message from the client:
+    assert checklist == ['a', 'b', 'c']
+
+    server_3000.stop()	# clean up
