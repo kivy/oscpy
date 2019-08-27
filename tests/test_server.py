@@ -889,7 +889,7 @@ def test_server_different_port():
 
     # server, will be tested:
     server_3000 = OSCThreadServer(encoding='utf8')
-    sock_3000 = server_3000.listen( address='0.0.0.0', port=3000, default=True)
+    sock_3000 = server_3000.listen(address='0.0.0.0', port=3000, default=True)
     server_3000.bind(b'/callback_3000', callback_3000)
 
     # clients sending to different ports, used to test the server:

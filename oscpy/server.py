@@ -243,7 +243,6 @@ class OSCThreadServer(object):
         else:
             addr = (address, port)
         sock.bind(addr)
-        # sock.setblocking(0)
         self.sockets.append(sock)
         if default and not self.default_socket:
             self.default_socket = sock
@@ -333,7 +332,11 @@ class OSCThreadServer(object):
                     continue
 
             for sender_socket in read:
-                data, sender = sender_socket.recvfrom(65535)
+                try:
+                    data, sender = sender_socket.recvfrom(65535)
+                except ConnectionResetError:
+                    continue
+
                 for address, tags, values, offset in read_packet(
                     data, drop_late=drop_late, encoding=self.encoding,
                     encoding_errors=self.encoding_errors
