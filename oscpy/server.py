@@ -334,7 +334,10 @@ class OSCThreadServer(object):
                     continue
 
             for sender_socket in read:
-                data, sender = sender_socket.recvfrom(UDP_MAX_SIZE)
+                try:
+                    data, sender = sender_socket.recvfrom(UDP_MAX_SIZE)
+                except (OSError, ConnectionResetError):
+                    continue
 
                 for address, tags, values, offset in read_packet(
                     data, drop_late=drop_late, encoding=self.encoding,
