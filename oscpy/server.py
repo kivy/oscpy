@@ -62,7 +62,7 @@ class OSCThreadServer(object):
         """Create an OSCThreadServer.
 
         - `timeout` is a number of seconds used as a time limit for
-          select() calls in the listening thread, optiomal, defaults to
+          select() calls in the listening thread, optional, defaults to
           0.01.
         - `drop_late_bundles` instruct the server not to dispatch calls
           from bundles that arrived after their timetag value.
@@ -327,7 +327,7 @@ class OSCThreadServer(object):
                 continue
             else:
                 try:
-                    read, write, error = select(self.sockets, [], [], self.timeout)
+                    read, _, _ = select(self.sockets, [], [], self.timeout)
                 except (ValueError, socket.error):
                     continue
 
@@ -441,7 +441,8 @@ class OSCThreadServer(object):
         return stats
 
     def get_sender(self):
-        """Return the socket, ip and port of the message that is currently being managed.
+        """Return the socket, ip and port of the message that is
+        currently being managed.
         Warning::
 
             this method should only be called from inside the handling
@@ -568,8 +569,9 @@ class OSCThreadServer(object):
         """
         self.bind(b'/_oscpy/version', self._get_version, sock=sock)
         self.bind(b'/_oscpy/routes', self._get_routes, sock=sock)
-        self.bind(b'/_oscpy/stats/received', self._get_stats_received, sock=sock)
         self.bind(b'/_oscpy/stats/sent', self._get_stats_sent, sock=sock)
+        self.bind(b'/_oscpy/stats/received',
+                  self._get_stats_received, sock=sock)
 
     def _get_version(self, port, *args):
         self.answer(
