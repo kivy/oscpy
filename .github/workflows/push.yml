@@ -21,7 +21,7 @@ jobs:
     - name: install
       run: pip install .[dev,ci]
     - name: test
-      run: python -m pytest --reruns 5 tests/ --cov oscpy/ --cov-branch
+      run: python -m pytest --reruns 2 tests/ --cov oscpy/ --cov-branch
     - name: coveralls
       run: python -m coveralls
       env:
