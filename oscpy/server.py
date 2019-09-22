@@ -19,6 +19,8 @@ from oscpy.parser import read_packet, UNICODE
 from oscpy.client import send_bundle, send_message
 from oscpy.stats import Stats
 
+UDP_MAX_SIZE = 65535
+
 
 def ServerClass(cls):
     """Decorate classes with for methods implementing OSC endpoints.
@@ -332,10 +334,7 @@ class OSCThreadServer(object):
                     continue
 
             for sender_socket in read:
-                try:
-                    data, sender = sender_socket.recvfrom(65535)
-                except ConnectionResetError:
-                    continue
+                data, sender = sender_socket.recvfrom(UDP_MAX_SIZE)
 
                 for address, tags, values, offset in read_packet(
                     data, drop_late=drop_late, encoding=self.encoding,

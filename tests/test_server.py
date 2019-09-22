@@ -937,8 +937,8 @@ def test_close_receiving():
     port = osc.getaddress()[1]
 
     def send_messages():
-        for i in range(5000):
-            send_message(b'/flood', [b't' * 60000], 'localhost', port, safer=True)
+        for i in range(500):
+            send_message(b'/flood', [b't' * 60000], 'localhost', port)
 
     thread = Thread(target=send_messages)
     thread.start()
