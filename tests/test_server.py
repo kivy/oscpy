@@ -930,13 +930,19 @@ def test_server_different_port():
 
 
 def test_close_receiving():
+    from threading import Thread
+
     osc = OSCThreadServer(encoding='utf8')
     osc.listen(default=True)
     port = osc.getaddress()[1]
 
-    # this should keep the server busy receiving for a while
-    for i in range(5000):
-        send_message(b'/flood', [b't' * 60000], 'localhost', port)
+    def send_messages():
+        for i in range(5000):
+            send_message(b'/flood', [b't' * 60000], 'localhost', port, safer=True)
+
+    thread = Thread(target=send_messages)
+    thread.start()
 
     # surprise, let's stop it asap!
     osc.stop_all()
+    thread.join()
