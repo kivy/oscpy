@@ -27,14 +27,9 @@ twine="python -m twine upload --disable-progress-bar"
 
 if [[ $GITHUB_REF =~ -test$ ]]; then
     twine="$twine --repository-url https://test.pypi.org/legacy/"
-
     draft="true"
     prerelease="true"
     message="test release $tag"
-else
-    echo "OOF this would have uploaded"
-    # python -m twine upload --disable-progress-bar dist/*
-    exit 0
 fi
 
 API_JSON="{
