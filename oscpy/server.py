@@ -2,7 +2,7 @@
 
 This module currently only implements `OSCThreadServer`, a thread based server.
 """
-
+import logging
 from threading import Thread, Event
 
 import os
@@ -18,6 +18,9 @@ from oscpy import __version__
 from oscpy.parser import read_packet, UNICODE
 from oscpy.client import send_bundle, send_message
 from oscpy.stats import Stats
+
+
+logger = logging.getLogger(__name__)
 
 
 def ServerClass(cls):
@@ -57,7 +60,7 @@ class OSCThreadServer(object):
 
     def __init__(
         self, drop_late_bundles=False, timeout=0.01, advanced_matching=False,
-        encoding='', encoding_errors='strict', default_handler=None
+        encoding='', encoding_errors='strict', default_handler=None, intercept_errors=True
     ):
         """Create an OSCThreadServer.
 
@@ -80,6 +83,9 @@ class OSCThreadServer(object):
         - `default_handler` if defined, will be used to handle any
           message that no configured address matched, the received
           arguments will be (address, *values).
+        - `intercept_errors`, if True, means that exception raised by
+          callbacks will be intercepted and logged. If False, the handler
+          thread will terminate mostly silently on such exceptions.
         """
         self._must_loop = True
         self._termination_event = Event()
@@ -93,11 +99,12 @@ class OSCThreadServer(object):
         self.encoding = encoding
         self.encoding_errors = encoding_errors
         self.default_handler = default_handler
+        self.intercept_errors = intercept_errors
 
         self.stats_received = Stats()
         self.stats_sent = Stats()
 
-        t = Thread(target=self._listen)
+        t = Thread(target=self._run_listener)
         t.daemon = True
         t.start()
         self._thread = t
@@ -322,8 +329,15 @@ class OSCThreadServer(object):
     def join_server(self, timeout=None):
         """Wait for the server to exit (`terminate_server()` must have been called before).
 
-        Returns True iff the inner thread exited before timeout."""
+        Returns True if and only if the inner thread exited before timeout."""
         return self._termination_event.wait(timeout=timeout)
+
+    def _run_listener(self):
+        """Wrapper just ensuring that the handler thread cleans up on exit."""
+        try:
+            self._listen()
+        finally:
+            self._termination_event.set()
 
     def _listen(self):
         """(internal) Busy loop to listen for events.
@@ -332,10 +346,24 @@ class OSCThreadServer(object):
         will be the one actually listening for messages on the server's
         sockets, and calling the callbacks when messages are received.
         """
+
         match = self._match_address
         advanced_matching = self.advanced_matching
         addresses = self.addresses
         stats = self.stats_received
+
+        def _execute_callbacks(_callbacks_list):
+            for cb, get_address in _callbacks_list:
+                try:
+                    if get_address:
+                        cb(address, *values)
+                    else:
+                        cb(*values)
+                except Exception as exc:
+                    if self.intercept_errors:
+                        logger.error("Unhandled exception caught in oscpy server", exc_info=True)
+                    else:
+                        raise
 
         while self._must_loop:
 
@@ -368,29 +396,18 @@ class OSCThreadServer(object):
                     if advanced_matching:
                         for sock, addr in addresses:
                             if sock == sender_socket and match(addr, address):
-                                matched = True
-                                for cb, get_address in addresses[(sock, addr)]:
-                                    if get_address:
-                                        cb(address, *values)
-                                    else:
-                                        cb(*values)
-
+                                callbacks_list = addresses.get((sock, addr), [])
+                                if callbacks_list:
+                                    matched = True
+                                    _execute_callbacks(callbacks_list)
                     else:
-                        if (sender_socket, address) in addresses:
+                        callbacks_list = addresses.get((sender_socket, address), [])
+                        if callbacks_list:
                             matched = True
-
-                        for cb, get_address in addresses.get(
-                            (sender_socket, address), []
-                        ):
-                            if get_address:
-                                cb(address, *values)
-                            else:
-                                cb(*values)
+                            _execute_callbacks(callbacks_list)
 
                     if not matched and self.default_handler:
                         self.default_handler(address, *values)
-
-        self._termination_event.set()
 
     @staticmethod
     def _match_address(smart_address, target_address):
