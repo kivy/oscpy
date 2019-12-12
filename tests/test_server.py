@@ -90,6 +90,15 @@ def test_stop_all():
     osc.stop_all()
 
 
+def test_terminate_server():
+    osc = OSCThreadServer()
+    assert not osc.join_server(timeout=0.1)
+    assert osc._thread.is_alive()
+    osc.terminate_server()
+    assert osc.join_server(timeout=0.1)
+    assert not osc._thread.is_alive()
+
+
 def test_send_message_without_socket():
     osc = OSCThreadServer()
     with pytest.raises(RuntimeError):

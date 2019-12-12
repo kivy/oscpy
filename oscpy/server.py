@@ -3,7 +3,7 @@
 This module currently only implements `OSCThreadServer`, a thread based server.
 """
 
-from threading import Thread
+from threading import Thread, Event
 
 import os
 import re
@@ -81,6 +81,9 @@ class OSCThreadServer(object):
           message that no configured address matched, the received
           arguments will be (address, *values).
         """
+        self._must_loop = True
+        self._termination_event = Event()
+
         self.addresses = {}
         self.sockets = []
         self.timeout = timeout
@@ -97,6 +100,7 @@ class OSCThreadServer(object):
         t = Thread(target=self._listen)
         t.daemon = True
         t.start()
+        self._thread = t
 
         self._smart_address_cache = {}
         self._smart_part_cache = {}
@@ -308,6 +312,19 @@ class OSCThreadServer(object):
             self.stop(s)
         sleep(10e-9)
 
+    def terminate_server(self):
+        """Request the inner thread to finish its tasks and exit.
+
+        May be called from an event, too.
+        """
+        self._must_loop = False
+
+    def join_server(self, timeout=None):
+        """Wait for the server to exit (`terminate_server()` must have been called before).
+
+        Returns True iff the inner thread exited before timeout."""
+        return self._termination_event.wait(timeout=timeout)
+
     def _listen(self):
         """(internal) Busy loop to listen for events.
 
@@ -320,7 +337,8 @@ class OSCThreadServer(object):
         addresses = self.addresses
         stats = self.stats_received
 
-        while True:
+        while self._must_loop:
+
             drop_late = self.drop_late_bundles
             if not self.sockets:
                 sleep(.01)
@@ -371,6 +389,8 @@ class OSCThreadServer(object):
 
                     if not matched and self.default_handler:
                         self.default_handler(address, *values)
+
+        self._termination_event.set()
 
     @staticmethod
     def _match_address(smart_address, target_address):
