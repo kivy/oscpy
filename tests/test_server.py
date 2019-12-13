@@ -90,10 +90,56 @@ def test_stop_all():
     osc.stop_all()
 
 
+def test_terminate_server():
+    osc = OSCThreadServer()
+    assert not osc.join_server(timeout=0.1)
+    assert osc._thread.is_alive()
+    osc.terminate_server()
+    assert osc.join_server(timeout=0.1)
+    assert not osc._thread.is_alive()
+
+
 def test_send_message_without_socket():
     osc = OSCThreadServer()
     with pytest.raises(RuntimeError):
         osc.send_message(b'/test', [], 'localhost', 0)
+
+
+def test_intercept_errors(caplog):
+
+    cont = []
+
+    def success(*values):
+        cont.append(True)
+
+    def broken_callback(*values):
+        raise ValueError("some bad value")
+
+    osc = OSCThreadServer()
+    sock = osc.listen()
+    port = sock.getsockname()[1]
+    osc.bind(b'/broken_callback', broken_callback, sock)
+    osc.bind(b'/success', success, sock)
+    send_message(b'/broken_callback', [b'test'], 'localhost', port)
+    sleep(0.01)
+    send_message(b'/success', [b'test'], 'localhost', port)
+    assert not osc.join_server(timeout=0.02)  # Thread not stopped
+    assert cont == [True]
+
+    assert len(caplog.records) == 1, caplog.records
+    record = caplog.records[0]
+    assert record.msg == "Unhandled exception caught in oscpy server"
+    assert not record.args
+    assert record.exc_info
+
+    osc = OSCThreadServer(intercept_errors=False)
+    sock = osc.listen()
+    port = sock.getsockname()[1]
+    osc.bind(b'/broken_callback', broken_callback, sock)
+    send_message(b'/broken_callback', [b'test'], 'localhost', port)
+    assert osc.join_server(timeout=0.02)  # Thread properly sets termination event on crash
+
+    assert len(caplog.records) == 1, caplog.records  # Unchanged
 
 
 def test_send_bundle_without_socket():

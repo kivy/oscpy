@@ -24,7 +24,8 @@ You can learn more about OSC on [OpenSoundControl.org](http://opensoundcontrol.o
 - fast
 - easy to use
 - robust (returns meaningful errors in case of malformed messages,
-  always do the right thing on correct messages)
+  always do the right thing on correct messages, and by default intercept+log 
+  the exceptions raised by callbacks)
 - separation of concerns (message parsing vs communication)
 - sync and async compatibility (threads, asyncio, trio…)
 - clean and easy to read code
@@ -32,7 +33,7 @@ You can learn more about OSC on [OpenSoundControl.org](http://opensoundcontrol.o
 #### Features
 
 - serialize and parse OSC data types/Messages/Bundles
-- a thread based udp server to open sockets and bind callbacks on osc addresses on them
+- a thread based udp server to open sockets (INET or UNIX) and bind callbacks on osc addresses on them
 - a simple client
 
 #### Install
@@ -51,11 +52,21 @@ from time import sleep
 def callback(*values):
     print("got values: {}".format(values))
 
-osc = OSCThreadServer()
+osc = OSCThreadServer()  # See sources for all the arguments
+
+# You can also use an \*nix socket path here
 sock = osc.listen(address='0.0.0.0', port=8000, default=True)
 osc.bind(b'/address', callback)
 sleep(1000)
-osc.stop()
+osc.stop()  # Stop the default socket
+
+osc.stop_all()  # Stop all sockets
+
+# Here the server is still alive, one might call osc.listen() again
+
+osc.terminate_server()  # Request the handler thread to stop looping
+
+osc.join_server()  # Wait for the handler thread to finish pending tasks and exit
 ```
 
 or you can use the decorator API.
@@ -173,6 +184,11 @@ OSCPy provides an "oscli" util, to help with debugging:
 - `oscli send` to send messages or bundles to a server
 
 See `oscli -h` for more information.
+
+#### GOTCHAS
+
+- `None` values are not allowed in serialization
+- Unix-type sockets must not already exist when you listen() on them
 
 #### TODO
 
