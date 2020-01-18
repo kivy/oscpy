@@ -91,6 +91,7 @@ class OSCThreadServer(object):
         self._termination_event = Event()
 
         self.addresses = {}
+        self.bind_alls = []
         self.sockets = []
         self.timeout = timeout
         self.default_socket = None
@@ -139,6 +140,36 @@ class OSCThreadServer(object):
         if cb not in callbacks:
             callbacks.append(cb)
         self.addresses[(sock, address)] = callbacks
+
+    def bind_all(self, callback, sock=None, get_address=False):
+        """Bind a callback to receive ALL incoming osc messages
+
+        A socket in the list of existing sockets of the server can be
+        given. If no socket is provided, the default socket of the
+        server is used, if no default socket has been defined, a
+        RuntimeError is raised.
+        """
+        if not sock and self.default_socket:
+            sock = self.default_socket
+        elif not sock:
+            raise RuntimeError('no default socket yet and no socket provided')
+
+        self.bind_alls.append((sock, callback, get_address))
+
+    def unbind_all(self, callback, sock=None):
+        """Unbind a callback that was registered to receive ALL incoming osc messages (using self.bind_all)
+
+        See `bind_all` for `sock` documentation.
+        """
+        if not sock and self.default_socket:
+            sock = self.default_socket
+        elif not sock:
+            raise RuntimeError('no default socket yet and no socket provided')
+
+        to_remove = filter(lambda cur: cur[0] == sock and cur[1] == callback, self.bind_alls)
+        for bind_all in to_remove:
+            self.bind_alls.remove(bind_all)
+
 
     def create_smart_address(self, address):
         """Create an advanced matching address from a string.
@@ -391,6 +422,11 @@ class OSCThreadServer(object):
                     stats.bytes += offset
                     stats.params += len(values)
                     stats.types.update(tags)
+
+                    # invoke all callbacks registered using self.bind_all
+                    for sock, cb, get_addr in self.bind_alls:
+                        if sock == sender_socket or sock == None:
+                            _execute_callbacks([(cb, get_addr)])
 
                     matched = False
                     if advanced_matching:
