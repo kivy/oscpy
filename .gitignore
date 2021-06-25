@@ -3,6 +3,10 @@
 *.c
 *.pyd
 *.egg-info
+*.swp
+*.swn
+.coverage
+htmlcov/
 .pytest_cache
 build
 dist

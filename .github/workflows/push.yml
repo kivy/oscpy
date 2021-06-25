@@ -5,7 +5,7 @@ jobs:
     name: base
     strategy:
       matrix:
-        python: [ '2.7', '3.5', '3.6', '3.6', '3.7']
+        python: [ '2.7', '3.6', '3.6', '3.7', '3.8', '3.9']
         # os: ['ubuntu-latest', 'windows-latest', 'macOs-latest']
         os: ['ubuntu-latest', 'windows-latest']
 
