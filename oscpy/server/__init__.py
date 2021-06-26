@@ -98,12 +98,8 @@ class OSCBaseServer(object):
         self._smart_part_cache = {}
 
     @staticmethod
-    def get_socket(family, address, port):
+    def get_socket(family, addr):
         sock = socket.socket(family, socket.SOCK_DGRAM)
-        if family == 'unix':
-            addr = address
-        else:
-            addr = (address, port)
         sock.bind(addr)
         return sock
 
@@ -133,7 +129,11 @@ class OSCBaseServer(object):
                 "Unknown socket family, accepted values are 'unix' and 'inet'"
             )
 
-        sock = self.get_socket(family_, address, port)
+        if family == 'unix':
+            addr = address
+        else:
+            addr = (address, port)
+        sock = self.get_socket(family_, addr)
         self.add_socket(sock, default)
         return sock
 
@@ -365,7 +365,7 @@ class OSCBaseServer(object):
         """
         frames = inspect.getouterframes(inspect.currentframe())
         for frame, filename, _, function, _, _ in frames:
-            if function == '_listen' and __FILE__.startswith(filename):
+            if function == 'handle_message' and __FILE__.startswith(filename):
                 break
         else:
             raise RuntimeError('get_sender() not called from a callback')
@@ -515,7 +515,7 @@ class OSCBaseServer(object):
             port=port
         )
 
-    def _execute_callbacks(self, callbacks_list, values):
+    def _execute_callbacks(self, callbacks_list, address, values):
         for cb, get_address in callbacks_list:
             try:
                 if get_address:
@@ -529,8 +529,8 @@ class OSCBaseServer(object):
                     raise
 
     def handle_message(self, data, sender, drop_late, sender_socket):
-        for callbacks, values in self.callbacks(data, sender, drop_late, sender_socket):
-            self._execute_callbacks(callbacks, values)
+        for callbacks, values, address in self.callbacks(data, sender, drop_late, sender_socket):
+            self._execute_callbacks(callbacks, address, values)
 
 
     def callbacks(self, data, sender, drop_late, sender_socket):
@@ -555,15 +555,15 @@ class OSCBaseServer(object):
                         callbacks_list = addresses.get((sock, addr), [])
                         if callbacks_list:
                             matched = True
-                            yield callbacks_list, values
+                            yield callbacks_list, values, address
             else:
                 callbacks_list = addresses.get((sender_socket, address), [])
                 if callbacks_list:
                     matched = True
-                    yield callbacks_list, values
+                    yield callbacks_list, values, address
 
             if not matched and self.default_handler:
-                yield partial(self.default_handler, address, *values)
+                yield [(self.default_handler, True)], values, address
 
 
 # backward compatibility

@@ -10,14 +10,10 @@ logger = logging.getLogger(__name__)
 
 class OSCTrioServer(OSCBaseServer):
     @staticmethod
-    async def get_socket(family, address, port):
+    async def get_socket(family, addr):
         # identical to the parent method, except here socket is trio.socket
         # and bind needs to be awaited
         sock = socket.socket(family, socket.SOCK_DGRAM)
-        if family == 'unix':
-            addr = address
-        else:
-            addr = (address, port)
         await sock.bind(addr)
         return sock
 

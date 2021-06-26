@@ -10,13 +10,9 @@ logger = logging.getLogger(__name__)
 class OSCCurioServer(OSCBaseServer):
 
     @staticmethod
-    def get_socket(family, address, port):
+    def get_socket(family, addr):
         # identical to the parent method, except here socket is curio.socket
         sock = socket.socket(family, socket.SOCK_DGRAM)
-        if family == 'unix':
-            addr = address
-        else:
-            addr = (address, port)
         sock.bind(addr)
         return sock
 
@@ -25,7 +21,7 @@ class OSCCurioServer(OSCBaseServer):
             while self._must_loop:
                 data, addr = await sock.recvfrom(UDP_MAX_SIZE)
                 await g.spawn(
-                    self.handle_message_async(
+                    self.handle_message(
                         data,
                         addr,
                         drop_late=False,
@@ -34,7 +30,7 @@ class OSCCurioServer(OSCBaseServer):
                 )
             await g.join()
 
-    async def handle_message_async(self, data, sender, drop_late, sender_socket):
+    async def handle_message(self, data, sender, drop_late, sender_socket):
         for callbacks, values in self.callbacks(data, sender, drop_late, sender_socket):
             await self._execute_callbacks_async(callbacks, values)
 
