@@ -10,6 +10,12 @@ def callback(*values):
     print("got values: {}".format(values))
 
 
-# exit after 1000 seconds
-sleep(1000)
-osc.stop()
+@osc.address('/stop')
+def callback(*values):
+    print("time to leave")
+    osc.stop_all()
+    osc.terminate_server()
+
+
+# wait until the server exits
+osc.join_server()

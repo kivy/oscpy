@@ -9,6 +9,10 @@ logger = logging.getLogger(__name__)
 
 class OSCCurioServer(OSCBaseServer):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.task_groups = {}
+
     @staticmethod
     def get_socket(family, addr):
         # identical to the parent method, except here socket is curio.socket
@@ -18,7 +22,8 @@ class OSCCurioServer(OSCBaseServer):
 
     async def _listen(self, sock):
         async with TaskGroup(wait=all) as g:
-            while self._must_loop:
+            self.task_groups[sock] = g
+            while not self._termination_event.is_set():
                 data, addr = await sock.recvfrom(UDP_MAX_SIZE)
                 await g.spawn(
                     self.handle_message(
@@ -31,10 +36,10 @@ class OSCCurioServer(OSCBaseServer):
             await g.join()
 
     async def handle_message(self, data, sender, drop_late, sender_socket):
-        for callbacks, values in self.callbacks(data, sender, drop_late, sender_socket):
-            await self._execute_callbacks_async(callbacks, values)
+        for callbacks, values, address in self.callbacks(data, sender, sender_socket):
+            await self._execute_callbacks(callbacks, address, values)
 
-    async def _execute_callbacks_async(self, callbacks_list, values):
+    async def _execute_callbacks(self, callbacks_list, address, values):
         for cb, get_address in callbacks_list:
             try:
                 if get_address:
@@ -55,3 +60,7 @@ class OSCCurioServer(OSCBaseServer):
 
     async def stop_all(self):
         await self.tasks_group.cancel_remaining()
+
+    async def stop(self, sock):
+        g = self.task_groups.pop(sock)
+        await g.cancel_remaining()

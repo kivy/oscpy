@@ -9,6 +9,10 @@ logger = logging.getLogger(__name__)
 
 
 class OSCTrioServer(OSCBaseServer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.nurseries = {}
+
     @staticmethod
     async def get_socket(family, addr):
         # identical to the parent method, except here socket is trio.socket
@@ -29,17 +33,18 @@ class OSCTrioServer(OSCBaseServer):
                 "Unknown socket family, accepted values are 'unix' and 'inet'"
             )
 
-        sock = await self.get_socket(family_, address, port)
+        sock = await self.get_socket(family_, (address, port))
         self.add_socket(sock, default)
         return sock
 
     async def _listen(self, sock):
         async with open_nursery() as nursery:
+            self.nurseries[sock] = nursery
             while True:
                 data, addr = await sock.recvfrom(UDP_MAX_SIZE)
                 nursery.start_soon(
                     partial(
-                        self.handle_message_async,
+                        self.handle_message,
                         data,
                         addr,
                         drop_late=False,
@@ -47,11 +52,11 @@ class OSCTrioServer(OSCBaseServer):
                     )
                 )
 
-    async def handle_message_async(self, data, sender, drop_late, sender_socket):
-        for callbacks, values in self.callbacks(data, sender, drop_late, sender_socket):
-            await self._execute_callbacks_async(callbacks, values)
+    async def handle_message(self, data, sender, drop_late, sender_socket):
+        for callbacks, values, address in self.callbacks(data, sender, sender_socket):
+            await self._execute_callbacks(callbacks, address, values)
 
-    async def _execute_callbacks_async(self, callbacks_list, values):
+    async def _execute_callbacks(self, callbacks_list, address, values):
         for cb, get_address in callbacks_list:
             try:
                 if get_address:
@@ -74,3 +79,22 @@ class OSCTrioServer(OSCBaseServer):
         """Exit the main nursery, cancelling any in progress task
         """
         self.nursery.cancel_scope.deadline = 0
+
+    async def stop(self, sock):
+        nursery = self.nurseries.pop(sock)
+        nursery.cancel_scope.deadline = 0
+
+    async def getaddress(self, sock=None):
+        """Wrap call to getsockname.
+
+        If `sock` is None, uses the default socket for the server.
+
+        Returns (ip, port) for an inet socket, or filename for an unix
+        socket.
+        """
+        if not sock and self.default_socket:
+            sock = self.default_socket
+        elif not sock:
+            raise RuntimeError('no default socket yet and no socket provided')
+
+        return await sock.getsockname()

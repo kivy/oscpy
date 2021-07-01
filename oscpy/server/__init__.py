@@ -3,10 +3,9 @@
 import logging
 import os
 import re
-from sys import version_info
+from sys import platform
 from threading import Event
 import inspect
-from sys import platform
 from time import time
 from functools import partial
 import socket
@@ -77,7 +76,6 @@ class OSCBaseServer(object):
           callbacks will be intercepted and logged. If False, the handler
           thread will terminate mostly silently on such exceptions.
         """
-        self._must_loop = True
         self._termination_event = Event()
 
         self.addresses = {}
@@ -528,16 +526,17 @@ class OSCBaseServer(object):
                 else:
                     raise
 
-    def handle_message(self, data, sender, drop_late, sender_socket):
-        for callbacks, values, address in self.callbacks(data, sender, drop_late, sender_socket):
+    def handle_message(self, data, sender, sender_socket):
+        for callbacks, values, address in self.callbacks(data, sender, sender_socket):
             self._execute_callbacks(callbacks, address, values)
 
 
-    def callbacks(self, data, sender, drop_late, sender_socket):
+    def callbacks(self, data, sender, sender_socket):
         match = self._match_address
         advanced_matching = self.advanced_matching
         addresses = self.addresses
         stats = self.stats_received
+        drop_late = self.drop_late_bundles
 
         for address, tags, values, offset in read_packet(
             data, drop_late=drop_late, encoding=self.encoding,
@@ -564,6 +563,19 @@ class OSCBaseServer(object):
 
             if not matched and self.default_handler:
                 yield [(self.default_handler, True)], values, address
+
+    def terminate_server(self):
+        """Request the inner thread to finish its tasks and exit.
+
+        May be called from an event, too.
+        """
+        self._termination_event.set()
+
+    def join_server(self, timeout=None):
+        """Wait for the server to exit (`terminate_server()` must have been called before).
+
+        Returns True if and only if the inner thread exited before timeout."""
+        return self._termination_event.wait(timeout=timeout)
 
 
 # backward compatibility

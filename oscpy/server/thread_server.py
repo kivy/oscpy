@@ -51,19 +51,6 @@ class OSCThreadServer(OSCBaseServer):
             self.stop(s)
         sleep(10e-9)
 
-    def terminate_server(self):
-        """Request the inner thread to finish its tasks and exit.
-
-        May be called from an event, too.
-        """
-        self._must_loop = False
-
-    def join_server(self, timeout=None):
-        """Wait for the server to exit (`terminate_server()` must have been called before).
-
-        Returns True if and only if the inner thread exited before timeout."""
-        return self._termination_event.wait(timeout=timeout)
-
     def _run_listener(self):
         """Wrapper just ensuring that the handler thread cleans up on exit."""
         try:
@@ -79,8 +66,7 @@ class OSCThreadServer(OSCBaseServer):
         sockets, and calling the callbacks when messages are received.
         """
 
-        while self._must_loop:
-            drop_late = self.drop_late_bundles
+        while not self._termination_event.is_set():
             if not self.sockets:
                 sleep(.01)
                 continue
@@ -96,4 +82,4 @@ class OSCThreadServer(OSCBaseServer):
                 except ConnectionResetError:
                     continue
 
-                self.handle_message(data, sender, drop_late, sender_socket)
+                self.handle_message(data, sender, sender_socket)
