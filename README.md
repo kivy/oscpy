@@ -15,7 +15,7 @@ simple to use, OSC addresses look like http URLs, and accept various basic
 types, such as string, float, int, etc. You can think of it basically as an
 http POST, with less overhead.
 
-You can learn more about OSC on [OpenSoundControl.org](http://opensoundcontrol.org/introduction-osc)
+You can learn more about OSC on [OpenSoundControl.org](http://opensoundcontrol.org/)
 
 #### Goals
 
