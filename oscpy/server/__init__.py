@@ -1,17 +1,13 @@
 """Server API.
-
-This module currently only implements `OSCThreadServer`, a thread based server.
 """
 import logging
-from threading import Thread, Event
-
 import os
 import re
-import inspect
 from sys import platform
-from time import sleep, time
+from threading import Event
+import inspect
+from time import time
 from functools import partial
-from select import select
 import socket
 
 from oscpy import __version__
@@ -21,6 +17,8 @@ from oscpy.stats import Stats
 
 
 logger = logging.getLogger(__name__)
+
+UDP_MAX_SIZE = 65535
 
 
 def ServerClass(cls):
@@ -48,21 +46,12 @@ def ServerClass(cls):
 __FILE__ = inspect.getfile(ServerClass)
 
 
-class OSCThreadServer(object):
-    """A thread-based OSC server.
-
-    Listens for osc messages in a thread, and dispatches the messages
-    values to callbacks from there.
-
-    The '/_oscpy/' namespace is reserved for metadata about the OSCPy
-    internals, please see package documentation for further details.
-    """
-
+class OSCBaseServer(object):
     def __init__(
         self, drop_late_bundles=False, timeout=0.01, advanced_matching=False,
         encoding='', encoding_errors='strict', default_handler=None, intercept_errors=True
     ):
-        """Create an OSCThreadServer.
+        """Create an OSC Server.
 
         - `timeout` is a number of seconds used as a time limit for
           select() calls in the listening thread, optiomal, defaults to
@@ -87,7 +76,6 @@ class OSCThreadServer(object):
           callbacks will be intercepted and logged. If False, the handler
           thread will terminate mostly silently on such exceptions.
         """
-        self._must_loop = True
         self._termination_event = Event()
 
         self.addresses = {}
@@ -104,13 +92,59 @@ class OSCThreadServer(object):
         self.stats_received = Stats()
         self.stats_sent = Stats()
 
-        t = Thread(target=self._run_listener)
-        t.daemon = True
-        t.start()
-        self._thread = t
-
         self._smart_address_cache = {}
         self._smart_part_cache = {}
+
+    @staticmethod
+    def get_socket(family, addr):
+        sock = socket.socket(family, socket.SOCK_DGRAM)
+        sock.bind(addr)
+        return sock
+
+    def listen(
+        self, address='localhost', port=0, default=False, family='inet'
+    ):
+        """Start listening on an (address, port).
+
+        - if `port` is 0, the system will allocate a free port
+        - if `default` is True, the instance will save this socket as the
+          default one for subsequent calls to methods with an optional socket
+        - `family` accepts the 'unix' and 'inet' values, a socket of the
+          corresponding type will be created.
+          If family is 'unix', then the address must be a filename, the
+          `port` value won't be used. 'unix' sockets are not defined on
+          Windows.
+
+        The socket created to listen is returned, and can be used later
+        with methods accepting the `sock` parameter.
+        """
+        if family == 'unix':
+            family_ = socket.AF_UNIX
+        elif family == 'inet':
+            family_ = socket.AF_INET
+        else:
+            raise ValueError(
+                "Unknown socket family, accepted values are 'unix' and 'inet'"
+            )
+
+        if family == 'unix':
+            addr = address
+        else:
+            addr = (address, port)
+        sock = self.get_socket(family_, addr)
+        self.add_socket(sock, default)
+        return sock
+
+    def add_socket(self, sock, default):
+        self.sockets.append(sock)
+        if default and not self.default_socket:
+            self.default_socket = sock
+        elif default:
+            raise RuntimeError(
+                'Only one default socket authorized! Please set '
+                'default=False to other calls to listen()'
+            )
+        self.bind_meta_routes(sock)
 
     def bind(self, address, callback, sock=None, get_address=False):
         """Bind a callback to an osc address.
@@ -222,49 +256,6 @@ class OSCThreadServer(object):
 
         self.addresses[(sock, address)] = callbacks
 
-    def listen(
-        self, address='localhost', port=0, default=False, family='inet'
-    ):
-        """Start listening on an (address, port).
-
-        - if `port` is 0, the system will allocate a free port
-        - if `default` is True, the instance will save this socket as the
-          default one for subsequent calls to methods with an optional socket
-        - `family` accepts the 'unix' and 'inet' values, a socket of the
-          corresponding type will be created.
-          If family is 'unix', then the address must be a filename, the
-          `port` value won't be used. 'unix' sockets are not defined on
-          Windows.
-
-        The socket created to listen is returned, and can be used later
-        with methods accepting the `sock` parameter.
-        """
-        if family == 'unix':
-            family_ = socket.AF_UNIX
-        elif family == 'inet':
-            family_ = socket.AF_INET
-        else:
-            raise ValueError(
-                "Unknown socket family, accepted values are 'unix' and 'inet'"
-            )
-
-        sock = socket.socket(family_, socket.SOCK_DGRAM)
-        if family == 'unix':
-            addr = address
-        else:
-            addr = (address, port)
-        sock.bind(addr)
-        self.sockets.append(sock)
-        if default and not self.default_socket:
-            self.default_socket = sock
-        elif default:
-            raise RuntimeError(
-                'Only one default socket authorized! Please set '
-                'default=False to other calls to listen()'
-            )
-        self.bind_meta_routes(sock)
-        return sock
-
     def close(self, sock=None):
         """Close a socket opened by the server."""
         if not sock and self.default_socket:
@@ -294,120 +285,6 @@ class OSCThreadServer(object):
             raise RuntimeError('no default socket yet and no socket provided')
 
         return sock.getsockname()
-
-    def stop(self, s=None):
-        """Close and remove a socket from the server's sockets.
-
-        If `sock` is None, uses the default socket for the server.
-
-        """
-        if not s and self.default_socket:
-            s = self.default_socket
-
-        if s in self.sockets:
-            read = select([s], [], [], 0)
-            s.close()
-            if s in read:
-                s.recvfrom(65535)
-            self.sockets.remove(s)
-        else:
-            raise RuntimeError('{} is not one of my sockets!'.format(s))
-
-    def stop_all(self):
-        """Call stop on all the existing sockets."""
-        for s in self.sockets[:]:
-            self.stop(s)
-        sleep(10e-9)
-
-    def terminate_server(self):
-        """Request the inner thread to finish its tasks and exit.
-
-        May be called from an event, too.
-        """
-        self._must_loop = False
-
-    def join_server(self, timeout=None):
-        """Wait for the server to exit (`terminate_server()` must have been called before).
-
-        Returns True if and only if the inner thread exited before timeout."""
-        return self._termination_event.wait(timeout=timeout)
-
-    def _run_listener(self):
-        """Wrapper just ensuring that the handler thread cleans up on exit."""
-        try:
-            self._listen()
-        finally:
-            self._termination_event.set()
-
-    def _listen(self):
-        """(internal) Busy loop to listen for events.
-
-        This method is called in a thread by the `listen` method, and
-        will be the one actually listening for messages on the server's
-        sockets, and calling the callbacks when messages are received.
-        """
-
-        match = self._match_address
-        advanced_matching = self.advanced_matching
-        addresses = self.addresses
-        stats = self.stats_received
-
-        def _execute_callbacks(_callbacks_list):
-            for cb, get_address in _callbacks_list:
-                try:
-                    if get_address:
-                        cb(address, *values)
-                    else:
-                        cb(*values)
-                except Exception as exc:
-                    if self.intercept_errors:
-                        logger.error("Unhandled exception caught in oscpy server", exc_info=True)
-                    else:
-                        raise
-
-        while self._must_loop:
-
-            drop_late = self.drop_late_bundles
-            if not self.sockets:
-                sleep(.01)
-                continue
-            else:
-                try:
-                    read, write, error = select(self.sockets, [], [], self.timeout)
-                except (ValueError, socket.error):
-                    continue
-
-            for sender_socket in read:
-                try:
-                    data, sender = sender_socket.recvfrom(65535)
-                except ConnectionResetError:
-                    continue
-
-                for address, tags, values, offset in read_packet(
-                    data, drop_late=drop_late, encoding=self.encoding,
-                    encoding_errors=self.encoding_errors
-                ):
-                    stats.calls += 1
-                    stats.bytes += offset
-                    stats.params += len(values)
-                    stats.types.update(tags)
-
-                    matched = False
-                    if advanced_matching:
-                        for sock, addr in addresses:
-                            if sock == sender_socket and match(addr, address):
-                                callbacks_list = addresses.get((sock, addr), [])
-                                if callbacks_list:
-                                    matched = True
-                                    _execute_callbacks(callbacks_list)
-                    else:
-                        callbacks_list = addresses.get((sender_socket, address), [])
-                        if callbacks_list:
-                            matched = True
-                            _execute_callbacks(callbacks_list)
-
-                    if not matched and self.default_handler:
-                        self.default_handler(address, *values)
 
     @staticmethod
     def _match_address(smart_address, target_address):
@@ -486,7 +363,7 @@ class OSCThreadServer(object):
         """
         frames = inspect.getouterframes(inspect.currentframe())
         for frame, filename, _, function, _, _ in frames:
-            if function == '_listen' and __FILE__.startswith(filename):
+            if function == 'handle_message' and __FILE__.startswith(filename):
                 break
         else:
             raise RuntimeError('get_sender() not called from a callback')
@@ -635,3 +512,72 @@ class OSCThreadServer(object):
             self.stats_sent.to_tuple(),
             port=port
         )
+
+    def _execute_callbacks(self, callbacks_list, address, values):
+        for cb, get_address in callbacks_list:
+            try:
+                if get_address:
+                    cb(address, *values)
+                else:
+                    cb(*values)
+            except Exception:
+                if self.intercept_errors:
+                    logger.error("Unhandled exception caught in oscpy server", exc_info=True)
+                else:
+                    raise
+
+    def handle_message(self, data, sender, sender_socket):
+        for callbacks, values, address in self.callbacks(data, sender, sender_socket):
+            self._execute_callbacks(callbacks, address, values)
+
+
+    def callbacks(self, data, sender, sender_socket):
+        match = self._match_address
+        advanced_matching = self.advanced_matching
+        addresses = self.addresses
+        stats = self.stats_received
+        drop_late = self.drop_late_bundles
+
+        for address, tags, values, offset in read_packet(
+            data, drop_late=drop_late, encoding=self.encoding,
+            encoding_errors=self.encoding_errors
+        ):
+            stats.calls += 1
+            stats.bytes += offset
+            stats.params += len(values)
+            stats.types.update(tags)
+
+            matched = False
+            if advanced_matching:
+                for sock, addr in addresses:
+                    if sock == sender_socket and match(addr, address):
+                        callbacks_list = addresses.get((sock, addr), [])
+                        if callbacks_list:
+                            matched = True
+                            yield callbacks_list, values, address
+            else:
+                callbacks_list = addresses.get((sender_socket, address), [])
+                if callbacks_list:
+                    matched = True
+                    yield callbacks_list, values, address
+
+            if not matched and self.default_handler:
+                yield [(self.default_handler, True)], values, address
+
+    def terminate_server(self):
+        """Request the inner thread to finish its tasks and exit.
+
+        May be called from an event, too.
+        """
+        self._termination_event.set()
+
+    def join_server(self, timeout=None):
+        """Wait for the server to exit (`terminate_server()` must have been called before).
+
+        Returns True if and only if the inner thread exited before timeout."""
+        return self._termination_event.wait(timeout=timeout)
+
+
+# backward compatibility
+
+from oscpy.server.thread_server import OSCThreadServer

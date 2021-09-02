@@ -6,6 +6,7 @@ import socket
 from tempfile import mktemp
 from os.path import exists
 from os import unlink
+from threading import Event
 
 from oscpy.server import OSCThreadServer, ServerClass
 from oscpy.client import send_message, send_bundle, OSCClient
@@ -107,10 +108,10 @@ def test_send_message_without_socket():
 
 def test_intercept_errors(caplog):
 
-    cont = []
+    event = Event()
 
     def success(*values):
-        cont.append(True)
+        event.set()
 
     def broken_callback(*values):
         raise ValueError("some bad value")
@@ -124,7 +125,7 @@ def test_intercept_errors(caplog):
     sleep(0.01)
     send_message(b'/success', [b'test'], 'localhost', port)
     assert not osc.join_server(timeout=0.02)  # Thread not stopped
-    assert cont == [True]
+    assert event.is_set()
 
     assert len(caplog.records) == 1, caplog.records
     record = caplog.records[0]
@@ -160,69 +161,59 @@ def test_bind():
     osc = OSCThreadServer()
     sock = osc.listen()
     port = sock.getsockname()[1]
-    cont = []
+    event = Event()
 
     def success(*values):
-        cont.append(True)
+        event.set()
 
     osc.bind(b'/success', success, sock)
 
     send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port)
 
-    timeout = time() + 5
-    while not cont:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
+    assert event.wait(5), 'timeout while waiting for success message.'
 
 
 def test_bind_get_address():
     osc = OSCThreadServer()
     sock = osc.listen()
     port = sock.getsockname()[1]
-    cont = []
+    event = Event()
 
     def success(address, *values):
         assert address == b'/success'
-        cont.append(True)
+        event.set()
 
     osc.bind(b'/success', success, sock, get_address=True)
 
     send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port)
 
-    timeout = time() + 5
-    while not cont:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
+    assert event.wait(5), 'timeout while waiting for success message.'
 
 
 def test_bind_get_address_smart():
     osc = OSCThreadServer(advanced_matching=True)
     sock = osc.listen()
     port = sock.getsockname()[1]
-    cont = []
+    event = Event()
 
     def success(address, *values):
         assert address == b'/success/a'
-        cont.append(True)
+        event.set()
 
     osc.bind(b'/success/?', success, sock, get_address=True)
 
     send_message(b'/success/a', [b'test', 1, 1.12345], 'localhost', port)
 
-    timeout = time() + 5
-    while not cont:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
+    assert event.wait(5), 'timeout while waiting for success message.'
 
 
 def test_reuse_callback():
     osc = OSCThreadServer()
     sock = osc.listen()
     port = sock.getsockname()[1]
-    cont = []
 
     def success(*values):
-        cont.append(True)
+        pass
 
     osc.bind(b'/success', success, sock)
     osc.bind(b'/success', success, sock)
@@ -235,10 +226,10 @@ def test_unbind():
     osc = OSCThreadServer()
     sock = osc.listen()
     port = sock.getsockname()[1]
-    cont = []
+    event = Event()
 
     def failure(*values):
-        cont.append(True)
+        event.set()
 
     osc.bind(b'/failure', failure, sock)
     with pytest.raises(RuntimeError) as e_info:  # noqa
@@ -247,30 +238,24 @@ def test_unbind():
 
     send_message(b'/failure', [b'test', 1, 1.12345], 'localhost', port)
 
-    timeout = time() + 1
-    while time() > timeout:
-        assert not cont
-        sleep(10e-9)
+    assert not event.wait(1), "Unexpected call to failure()"
 
 
 def test_unbind_default():
     osc = OSCThreadServer()
     sock = osc.listen(default=True)
     port = sock.getsockname()[1]
-    cont = []
+    event = Event()
 
     def failure(*values):
-        cont.append(True)
+        event.set()
 
     osc.bind(b'/failure', failure)
     osc.unbind(b'/failure', failure)
 
     send_message(b'/failure', [b'test', 1, 1.12345], 'localhost', port)
 
-    timeout = time() + 1
-    while time() > timeout:
-        assert not cont
-        sleep(10e-9)
+    assert not event.wait(1), "Unexpected call to failure()"
 
 
 def test_bind_multi():
@@ -280,13 +265,14 @@ def test_bind_multi():
 
     sock2 = osc.listen()
     port2 = sock2.getsockname()[1]
-    cont = []
+    event1 = Event()
+    event2 = Event()
 
     def success1(*values):
-        cont.append(True)
+        event1.set()
 
     def success2(*values):
-        cont.append(False)
+        event2.set()
 
     osc.bind(b'/success', success1, sock1)
     osc.bind(b'/success', success2, sock2)
@@ -294,12 +280,7 @@ def test_bind_multi():
     send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port1)
     send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port2)
 
-    timeout = time() + 5
-    while len(cont) < 2:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
-
-    assert True in cont and False in cont
+    assert event2.wait(1) and event1.is_set()
 
 
 def test_bind_address():
@@ -662,7 +643,7 @@ def test_decorator():
 def test_answer():
     cont = []
 
-    osc_1 = OSCThreadServer()
+    osc_1 = OSCThreadServer(intercept_errors=False)
     osc_1.listen(default=True)
 
     @osc_1.address(b'/ping')
@@ -676,14 +657,14 @@ def test_answer():
                 ]
             )
 
-    osc_2 = OSCThreadServer()
+    osc_2 = OSCThreadServer(intercept_errors=False)
     osc_2.listen(default=True)
 
     @osc_2.address(b'/pong')
     def pong(*values):
         osc_2.answer(b'/ping', [True])
 
-    osc_3 = OSCThreadServer()
+    osc_3 = OSCThreadServer(intercept_errors=False)
     osc_3.listen(default=True)
 
     @osc_3.address(b'/zap')
