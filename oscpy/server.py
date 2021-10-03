@@ -383,31 +383,37 @@ class OSCThreadServer(object):
                 except ConnectionResetError:
                     continue
 
-                for address, tags, values, offset in read_packet(
-                    data, drop_late=drop_late, encoding=self.encoding,
-                    encoding_errors=self.encoding_errors
-                ):
-                    stats.calls += 1
-                    stats.bytes += offset
-                    stats.params += len(values)
-                    stats.types.update(tags)
+                try:
+                    for address, tags, values, offset in read_packet(
+                        data, drop_late=drop_late, encoding=self.encoding,
+                        encoding_errors=self.encoding_errors
+                    ):
+                        stats.calls += 1
+                        stats.bytes += offset
+                        stats.params += len(values)
+                        stats.types.update(tags)
 
-                    matched = False
-                    if advanced_matching:
-                        for sock, addr in addresses:
-                            if sock == sender_socket and match(addr, address):
-                                callbacks_list = addresses.get((sock, addr), [])
-                                if callbacks_list:
-                                    matched = True
-                                    _execute_callbacks(callbacks_list)
+                        matched = False
+                        if advanced_matching:
+                            for sock, addr in addresses:
+                                if sock == sender_socket and match(addr, address):
+                                    callbacks_list = addresses.get((sock, addr), [])
+                                    if callbacks_list:
+                                        matched = True
+                                        _execute_callbacks(callbacks_list)
+                        else:
+                            callbacks_list = addresses.get((sender_socket, address), [])
+                            if callbacks_list:
+                                matched = True
+                                _execute_callbacks(callbacks_list)
+
+                        if not matched and self.default_handler:
+                            self.default_handler(address, *values)
+                except ValueError:
+                    if self.intercept_errors:
+                        logger.error("Unhandled ValueError caught in oscpy server", exc_info=True)
                     else:
-                        callbacks_list = addresses.get((sender_socket, address), [])
-                        if callbacks_list:
-                            matched = True
-                            _execute_callbacks(callbacks_list)
-
-                    if not matched and self.default_handler:
-                        self.default_handler(address, *values)
+                        raise
 
     @staticmethod
     def _match_address(smart_address, target_address):
