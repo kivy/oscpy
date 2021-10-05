@@ -46,6 +46,7 @@ INF = float('inf')
 
 MidiTuple = namedtuple('MidiTuple', 'port_id status_byte data1 data2')
 
+
 def padded(l, n=4):
     """Return the size to pad a thing to.
 
@@ -237,7 +238,9 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
 
         if cls_or_value == UNICODE:
             if not encoding:
-                raise TypeError(u"Can't format unicode string without encoding")
+                raise TypeError(
+                    u"Can't format unicode string without encoding"
+                )
 
             cls_or_value = bytes
             value = (
@@ -274,7 +277,8 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
         tags,
         *(
             (
-                encode_cache.get(v) + NULL if isinstance(v, UNICODE) and encoding
+                encode_cache.get(v) + NULL
+                if isinstance(v, UNICODE) and encoding
                 else (v + NULL) if t in (b's', b'b')
                 else format_midi(v) if isinstance(v, MidiTuple)
                 else v

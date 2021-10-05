@@ -973,3 +973,22 @@ def test_server_different_port():
     assert checklist == ['a', 'b', 'c']
 
     server_3000.stop()	# clean up
+
+
+def test_close_receiving():
+    from threading import Thread
+
+    osc = OSCThreadServer(encoding='utf8')
+    osc.listen(default=True)
+    port = osc.getaddress()[1]
+
+    def send_messages():
+        for i in range(500):
+            send_message(b'/flood', [b't' * 60000], 'localhost', port)
+
+    thread = Thread(target=send_messages)
+    thread.start()
+
+    # surprise, let's stop it asap!
+    osc.stop_all()
+    thread.join()

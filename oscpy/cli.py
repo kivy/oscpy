@@ -15,7 +15,7 @@ def _send(options):
     def _parse(s):
         try:
             return literal_eval(s)
-        except:
+        except (ValueError, SyntaxError):
             return s
 
     stats = Stats()
@@ -59,7 +59,7 @@ def __dump(options):
     return osc
 
 
-def _dump(options): # pragma: no cover
+def _dump(options):  # pragma: no cover
     osc = __dump(options)
     try:
         while True:
@@ -82,7 +82,8 @@ def init_parser():
                       help='port to send message to.')
     send.add_argument('--encoding', '-e', action='store', default='utf-8',
                       help='how to encode the strings')
-    send.add_argument('--encoding_errors', '-E', action='store', default='replace',
+    send.add_argument('--encoding_errors', '-E', action='store',
+                      default='replace',
                       help='how to treat string encoding issues')
     send.add_argument('--safer', '-s', action='store_true',
                       help='wait a little after sending message')
@@ -92,9 +93,10 @@ def init_parser():
     send.add_argument('address', action='store',
                       help='OSC address to send the message to.')
     send.add_argument('message', nargs='*',
-                        help='content of the message, separated by spaces.')
+                      help='content of the message, separated by spaces.')
 
-    dump = subparser.add_parser('dump', help='listen for messages and print them')
+    dump = subparser.add_parser('dump',
+                                help='listen for messages and print them')
     dump.set_defaults(func=_dump)
     dump.add_argument('--host', '-H', action='store', default='localhost',
                       help='host (ip or name) to send message to.')
@@ -102,14 +104,17 @@ def init_parser():
                       help='port to send message to.')
     dump.add_argument('--encoding', '-e', action='store', default='utf-8',
                       help='how to encode the strings')
-    dump.add_argument('--encoding_errors', '-E', action='store', default='replace',
+    dump.add_argument('--encoding_errors', '-E', action='store',
+                      default='replace',
                       help='how to treat string encoding issues')
 
-    # bridge = parser.add_parser('bridge', help='listen for messages and redirect them to a server')
+    # TODO
+    # bridge = parser.add_parser('bridge', help='listen for messages and
+    # redirect them to a server')
     return parser
 
 
-def main(): # pragma: no cover
+def main():  # pragma: no cover
     parser = init_parser()
     options = parser.parse_args()
     exit(options.func(options))
