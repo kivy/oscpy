@@ -61,6 +61,12 @@ class OSCCurioServer(OSCBaseServer):
     async def stop_all(self):
         await self.tasks_group.cancel_remaining()
 
-    async def stop(self, sock):
-        g = self.task_groups.pop(sock)
-        await g.cancel_remaining()
+    async def stop(self, sock=None):
+        if not sock and self.default_socket:
+            sock = self.default_socket
+
+        if sock in self.sockets:
+            g = self.task_groups.pop(sock)
+            await g.cancel_remaining()
+        else:
+            raise RuntimeError('{} is not one of my sockets!'.format(sock))

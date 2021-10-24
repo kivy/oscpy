@@ -83,3 +83,8 @@ class OSCThreadServer(OSCBaseServer):
                     continue
 
                 self.handle_message(data, sender, sender_socket)
+
+    def join_server(self, timeout=None):
+        result = super(OSCThreadServer, self).join_server(timeout=timeout)
+        self._thread.join(timeout=timeout)
+        return result

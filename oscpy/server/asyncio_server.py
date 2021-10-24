@@ -1,8 +1,12 @@
 import asyncio
 import socket
 from functools import partial
+from logging import getLogger
 
 from oscpy.server import OSCBaseServer
+
+
+logger = getLogger(__name__)
 
 
 class OSCAsyncioServer(OSCBaseServer):
@@ -13,17 +17,20 @@ class OSCAsyncioServer(OSCBaseServer):
 
     def listen(self, address='localhost', port=0, default=False, family='inet', **kwargs):
         loop = asyncio.get_event_loop()
-        addr = (address, port)
+        if family == 'unix':
+            addr = address
+        else:
+            addr = (address, port)
         sock = self.get_socket(
             family=socket.AF_UNIX if family == 'unix' else socket.AF_INET,
             addr=addr,
         )
-        self.listeners[addr] = awaitable = loop.create_datagram_endpoint(
+        self.listeners[(address, port or sock.getsockname()[1])] = loop.create_datagram_endpoint(
             partial(OSCProtocol, self.handle_message, sock),
             sock=sock,
         )
         self.add_socket(sock, default)
-        return awaitable
+        return sock
 
     async def process(self):
         return await asyncio.gather(
@@ -36,7 +43,6 @@ class OSCAsyncioServer(OSCBaseServer):
             await self._execute_callbacks(callbacks, address, values)
 
     async def _execute_callbacks(self, callbacks_list, address, values):
-        print(locals())
         for cb, get_address in callbacks_list:
             try:
                 if get_address:
@@ -45,9 +51,28 @@ class OSCAsyncioServer(OSCBaseServer):
                     await cb(*values)
             except Exception:
                 if self.intercept_errors:
-                    logger.error("Unhandled exception caught in oscpy server", exc_info=True)
+                    logger.exception("Unhandled exception caught in oscpy server")
                 else:
                     raise
+
+    def stop(self, sock=None):
+        """Close and remove a socket from the server's sockets.
+
+        If `sock` is None, uses the default socket for the server.
+
+        """
+        if not sock and self.default_socket:
+            sock = self.default_socket
+
+        if sock in self.sockets:
+            sock.close()
+            self.sockets.remove(sock)
+        else:
+            raise RuntimeError('{} is not one of my sockets!'.format(sock))
+
+    def stop_all(self):
+        for sock in self.sockets[:]:
+            self.stop(sock)
 
     async def join_server(self, timeout=None):
         """Wait for the server to exit (`terminate_server()` must have been called before).
@@ -60,7 +85,7 @@ class OSCProtocol(asyncio.DatagramProtocol):
     def __init__(self, message_handler, sock, **kwargs):
         super().__init__(**kwargs)
         self.message_handler = message_handler
-        self._socket = sock
+        self.socket = sock
         self.loop = asyncio.get_event_loop()
 
     def connection_made(self, transport):
@@ -68,5 +93,8 @@ class OSCProtocol(asyncio.DatagramProtocol):
 
     def datagram_received(self, data, addr):
         self.loop.call_soon(
-            lambda: asyncio.ensure_future(self.message_handler(data, addr, self._socket))
+            lambda: asyncio.ensure_future(self.message_handler(data, addr, self.socket))
         )
+
+    def getsockname(self):
+        return self.socket.getsockname()

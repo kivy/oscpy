@@ -522,7 +522,7 @@ class OSCBaseServer(object):
                     cb(*values)
             except Exception:
                 if self.intercept_errors:
-                    logger.error("Unhandled exception caught in oscpy server", exc_info=True)
+                    logger.exception("Unhandled exception caught in oscpy server")
                 else:
                     raise
 
@@ -576,7 +576,6 @@ class OSCBaseServer(object):
 
         Returns True if and only if the inner thread exited before timeout."""
         return self._termination_event.wait(timeout=timeout)
-
 
 # backward compatibility
 

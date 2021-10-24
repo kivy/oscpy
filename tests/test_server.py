@@ -1,7 +1,7 @@
 # coding: utf8
 import pytest
 from time import time, sleep
-from sys import platform
+from sys import platform, version_info
 import socket
 from tempfile import mktemp
 from os.path import exists
@@ -12,19 +12,37 @@ from oscpy.server import OSCThreadServer, ServerClass
 from oscpy.client import send_message, send_bundle, OSCClient
 from oscpy import __version__
 
+from utils import runner, _await, _callback
 
-def test_instance():
-    OSCThreadServer()
+if version_info > (3, 5, 0):
+    from oscpy.server.curio_server import OSCCurioServer
+    from oscpy.server.trio_server import OSCTrioServer
+    from oscpy.server.asyncio_server import OSCAsyncioServer
+    server_classes = {
+        OSCThreadServer,
+        # OSCTrioServer,
+        OSCAsyncioServer,
+        OSCCurioServer,
+    }
+else:
+    server_classes = [OSCThreadServer]
 
 
-def test_listen():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_instance(cls):
+    cls()
+
+
+@pytest.mark.parametrize("cls", server_classes)
+def test_listen(cls):
+    osc = cls()
     sock = osc.listen()
-    osc.stop(sock)
+    runner(osc, timeout=1, socket=sock)
 
 
-def test_getaddress():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_getaddress(cls):
+    osc = cls()
     sock = osc.listen()
     assert osc.getaddress(sock)[0] == '127.0.0.1'
 
@@ -33,11 +51,12 @@ def test_getaddress():
 
     sock2 = osc.listen(default=True)
     assert osc.getaddress(sock2)[0] == '127.0.0.1'
-    osc.stop(sock)
+    runner(osc, timeout=1, socket=sock)
 
 
-def test_listen_default():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_listen_default(cls):
+    osc = cls()
     sock = osc.listen(default=True)
 
     with pytest.raises(RuntimeError) as e_info:  # noqa
@@ -47,38 +66,46 @@ def test_listen_default():
     osc.listen(default=True)
 
 
-def test_close():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_close(cls):
+    osc = cls()
     osc.listen(default=True)
 
     osc.close()
     with pytest.raises(RuntimeError) as e_info:  # noqa
         osc.close()
 
-    if platform != 'win32':
-        filename = mktemp()
-        unix = osc.listen(address=filename, family='unix')
-        assert exists(filename)
-        osc.close(unix)
-        assert not exists(filename)
+
+@pytest.mark.skipif(platform == 'win32', reason="unix sockets not available on windows")
+@pytest.mark.parametrize("cls", server_classes)
+def test_close_unix(cls):
+    osc = cls()
+    filename = mktemp()
+    unix = osc.listen(address=filename, family='unix')
+    assert exists(filename)
+    osc.close(unix)
+    assert not exists(filename)
 
 
-def test_stop_unknown():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes - {OSCCurioServer})
+def test_stop_unknown(cls):
+    osc = cls()
     with pytest.raises(RuntimeError):
-        osc.stop(socket.socket())
+        _await(osc.stop, osc, args=[socket.socket()])
 
 
-def test_stop_default():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes - {OSCCurioServer})
+def test_stop_default(cls):
+    osc = cls()
     osc.listen(default=True)
     assert len(osc.sockets) == 1
     osc.stop()
     assert len(osc.sockets) == 0
 
 
-def test_stop_all():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes - {OSCCurioServer})
+def test_stop_all(cls):
+    osc = cls()
     sock = osc.listen(default=True)
     host, port = sock.getsockname()
     osc.listen()
@@ -91,8 +118,9 @@ def test_stop_all():
     osc.stop_all()
 
 
-def test_terminate_server():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_terminate_server(cls):
+    osc = cls()
     assert not osc.join_server(timeout=0.1)
     assert osc._thread.is_alive()
     osc.terminate_server()
@@ -100,13 +128,15 @@ def test_terminate_server():
     assert not osc._thread.is_alive()
 
 
-def test_send_message_without_socket():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_send_message_without_socket(cls):
+    osc = cls()
     with pytest.raises(RuntimeError):
         osc.send_message(b'/test', [], 'localhost', 0)
 
 
-def test_intercept_errors(caplog):
+@pytest.mark.parametrize("cls", server_classes)
+def test_intercept_errors(caplog, cls):
 
     event = Event()
 
@@ -116,7 +146,7 @@ def test_intercept_errors(caplog):
     def broken_callback(*values):
         raise ValueError("some bad value")
 
-    osc = OSCThreadServer()
+    osc = cls()
     sock = osc.listen()
     port = sock.getsockname()[1]
     osc.bind(b'/broken_callback', broken_callback, sock)
@@ -124,7 +154,7 @@ def test_intercept_errors(caplog):
     send_message(b'/broken_callback', [b'test'], 'localhost', port)
     sleep(0.01)
     send_message(b'/success', [b'test'], 'localhost', port)
-    assert not osc.join_server(timeout=0.02)  # Thread not stopped
+    runner(osc, timeout=.2)
     assert event.is_set()
 
     assert len(caplog.records) == 1, caplog.records
@@ -133,18 +163,18 @@ def test_intercept_errors(caplog):
     assert not record.args
     assert record.exc_info
 
-    osc = OSCThreadServer(intercept_errors=False)
+    osc = cls(intercept_errors=False)
     sock = osc.listen()
     port = sock.getsockname()[1]
     osc.bind(b'/broken_callback', broken_callback, sock)
     send_message(b'/broken_callback', [b'test'], 'localhost', port)
-    assert osc.join_server(timeout=0.02)  # Thread properly sets termination event on crash
-
+    runner(osc, timeout=.2)
     assert len(caplog.records) == 1, caplog.records  # Unchanged
 
 
-def test_send_bundle_without_socket():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_send_bundle_without_socket(cls):
+    osc = cls()
     with pytest.raises(RuntimeError):
         osc.send_bundle([], 'localhost', 0)
 
@@ -157,25 +187,27 @@ def test_send_bundle_without_socket():
     )
 
 
-def test_bind():
-    osc = OSCThreadServer()
-    sock = osc.listen()
+@pytest.mark.parametrize("cls", server_classes)
+def test_bind1(cls):
+    osc = cls()
+    sock = osc.listen(default=True)
     port = sock.getsockname()[1]
     event = Event()
 
     def success(*values):
         event.set()
 
-    osc.bind(b'/success', success, sock)
+    osc.bind(b'/success', success)
 
     send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port)
+    runner(osc, timeout=.2)
+    assert event.is_set(), 'timeout while waiting for success message.'
 
-    assert event.wait(5), 'timeout while waiting for success message.'
 
-
-def test_bind_get_address():
-    osc = OSCThreadServer()
-    sock = osc.listen()
+@pytest.mark.parametrize("cls", server_classes)
+def test_bind_get_address(cls):
+    osc = cls()
+    sock = osc.listen(default=True)
     port = sock.getsockname()[1]
     event = Event()
 
@@ -190,9 +222,10 @@ def test_bind_get_address():
     assert event.wait(5), 'timeout while waiting for success message.'
 
 
-def test_bind_get_address_smart():
-    osc = OSCThreadServer(advanced_matching=True)
-    sock = osc.listen()
+@pytest.mark.parametrize("cls", server_classes)
+def test_bind_get_address_smart(cls):
+    osc = cls(advanced_matching=True)
+    sock = osc.listen(default=True)
     port = sock.getsockname()[1]
     event = Event()
 
@@ -206,9 +239,9 @@ def test_bind_get_address_smart():
 
     assert event.wait(5), 'timeout while waiting for success message.'
 
-
-def test_reuse_callback():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_reuse_callback(cls):
+    osc = cls()
     sock = osc.listen()
     port = sock.getsockname()[1]
 
@@ -222,8 +255,9 @@ def test_reuse_callback():
     assert len(osc.addresses.get((sock, b'/success2'))) == 1
 
 
-def test_unbind():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_unbind(cls):
+    osc = cls()
     sock = osc.listen()
     port = sock.getsockname()[1]
     event = Event()
@@ -241,8 +275,9 @@ def test_unbind():
     assert not event.wait(1), "Unexpected call to failure()"
 
 
-def test_unbind_default():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_unbind_default(cls):
+    osc = cls()
     sock = osc.listen(default=True)
     port = sock.getsockname()[1]
     event = Event()
@@ -258,80 +293,73 @@ def test_unbind_default():
     assert not event.wait(1), "Unexpected call to failure()"
 
 
-def test_bind_multi():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_bind_multi(cls):
+    osc = cls()
+
     sock1 = osc.listen()
     port1 = sock1.getsockname()[1]
+    event1 = Event()
+    osc.bind(b'/success', _callback(osc, lambda *_: event1.set()), sock1)
 
     sock2 = osc.listen()
     port2 = sock2.getsockname()[1]
-    event1 = Event()
     event2 = Event()
-
-    def success1(*values):
-        event1.set()
-
-    def success2(*values):
-        event2.set()
-
-    osc.bind(b'/success', success1, sock1)
-    osc.bind(b'/success', success2, sock2)
+    osc.bind(b'/success', _callback(osc, lambda *_: event2.set()), sock2)
 
     send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port1)
     send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port2)
 
-    assert event2.wait(1) and event1.is_set()
+    runner(osc, timeout=.1)
+    assert (
+        event2.is_set()
+        and
+        event1.is_set()
+    ), 'timeout while waiting for success message.'
 
 
-def test_bind_address():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_bind_address(cls):
+    osc = cls()
     osc.listen(default=True)
     result = []
+    event = Event()
 
     @osc.address(b'/test')
     def success(*args):
-        result.append(True)
+        event.set()
 
     timeout = time() + 1
 
     send_message(b'/test', [], *osc.getaddress())
 
-    while len(result) < 1:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
-        sleep(10e-9)
-
-    assert True in result
+    assert event.wait(1), 'timeout while waiting for test message.'
 
 
-def test_bind_address_class():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_bind_address_class(cls):
+    osc = cls()
     osc.listen(default=True)
 
     @ServerClass
     class Test(object):
         def __init__(self):
-            self.result = []
+            self.event = Event()
 
         @osc.address_method(b'/test')
         def success(self, *args):
-            self.result.append(True)
+            self.event.set()
 
     timeout = time() + 1
 
     test = Test()
     send_message(b'/test', [], *osc.getaddress())
-
-    while len(test.result) < 1:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
-        sleep(10e-9)
-
-    assert True in test.result
+    assert test.event.wait(1), 'timeout while waiting for test message.'
 
 
-def test_bind_no_default():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_bind_no_default(cls):
+    osc = cls()
 
     def success(*values):
         pass
@@ -340,27 +368,26 @@ def test_bind_no_default():
         osc.bind(b'/success', success)
 
 
-def test_bind_default():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_bind_default(cls):
+    osc = cls()
     osc.listen(default=True)
     port = osc.getaddress()[1]
-    cont = []
+    event = Event()
 
     def success(*values):
-        cont.append(True)
+        event.set()
 
     osc.bind(b'/success', success)
 
     send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port)
 
-    timeout = time() + 5
-    while not cont:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
+    assert event.wait(1), 'timeout while waiting for test message.'
 
 
-def test_smart_address_match():
-    osc = OSCThreadServer(advanced_matching=True)
+@pytest.mark.parametrize("cls", server_classes)
+def test_smart_address_match(cls):
+    osc = cls(advanced_matching=True)
 
     address = osc.create_smart_address(b'/test?')
     assert osc._match_address(address, b'/testa')
@@ -429,13 +456,15 @@ def test_smart_address_match():
     assert not osc._match_address(address, b'/testtest/stuff')
 
 
-def test_smart_address_cache():
-    osc = OSCThreadServer(advanced_matching=True)
+@pytest.mark.parametrize("cls", server_classes)
+def test_smart_address_cache(cls):
+    osc = cls(advanced_matching=True)
     assert osc.create_smart_address(b'/a') == osc.create_smart_address(b'/a')
 
 
-def test_advanced_matching():
-    osc = OSCThreadServer(advanced_matching=True)
+@pytest.mark.parametrize("cls", server_classes)
+def test_advanced_matching(cls):
+    osc = cls(advanced_matching=True)
     osc.listen(default=True)
     port = osc.getaddress()[1]
     result = {}
@@ -615,8 +644,9 @@ def test_advanced_matching():
         sleep(10e-9)
 
 
-def test_decorator():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_decorator(cls):
+    osc = cls()
     sock = osc.listen(default=True)
     port = sock.getsockname()[1]
     cont = []
@@ -640,10 +670,11 @@ def test_decorator():
             raise OSError('timeout while waiting for success message.')
 
 
-def test_answer():
+@pytest.mark.parametrize("cls", server_classes)
+def test_answer(cls):
     cont = []
 
-    osc_1 = OSCThreadServer(intercept_errors=False)
+    osc_1 = cls(intercept_errors=False)
     osc_1.listen(default=True)
 
     @osc_1.address(b'/ping')
@@ -684,8 +715,9 @@ def test_answer():
         sleep(10e-9)
 
 
-def test_socket_family():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_socket_family(cls):
+    osc = cls()
     assert osc.listen().family == socket.AF_INET
     filename = mktemp()
     if platform != 'win32':
@@ -702,8 +734,9 @@ def test_socket_family():
         osc.listen(family='')
 
 
-def test_encoding_send():
-    osc = OSCThreadServer()
+@pytest.mark.parametrize("cls", server_classes)
+def test_encoding_send(cls):
+    osc = cls()
     osc.listen(default=True)
 
     values = []
@@ -726,8 +759,9 @@ def test_encoding_send():
         sleep(10e-9)
 
 
-def test_encoding_receive():
-    osc = OSCThreadServer(encoding='utf8')
+@pytest.mark.parametrize("cls", server_classes)
+def test_encoding_receive(cls):
+    osc = cls(encoding='utf8')
     osc.listen(default=True)
 
     values = []
@@ -753,8 +787,9 @@ def test_encoding_receive():
         sleep(10e-9)
 
 
-def test_encoding_send_receive():
-    osc = OSCThreadServer(encoding='utf8')
+@pytest.mark.parametrize("cls", server_classes)
+def test_encoding_send_receive(cls):
+    osc = cls(encoding='utf8')
     osc.listen(default=True)
 
     values = []
@@ -777,13 +812,14 @@ def test_encoding_send_receive():
         sleep(10e-9)
 
 
-def test_default_handler():
+@pytest.mark.parametrize("cls", server_classes)
+def test_default_handler(cls):
     results = []
 
     def test(address, *values):
         results.append((address, values))
 
-    osc = OSCThreadServer(default_handler=test)
+    osc = cls(default_handler=test)
     osc.listen(default=True)
 
     @osc.address(b'/passthrough')
@@ -814,8 +850,9 @@ def test_default_handler():
         assert e == r
 
 
-def test_get_version():
-    osc = OSCThreadServer(encoding='utf8')
+@pytest.mark.parametrize("cls", server_classes)
+def test_get_version(cls):
+    osc = cls(encoding='utf8')
     osc.listen(default=True)
 
     values = []
@@ -844,8 +881,9 @@ def test_get_version():
     assert __version__ in values
 
 
-def test_get_routes():
-    osc = OSCThreadServer(encoding='utf8')
+@pytest.mark.parametrize("cls", server_classes)
+def test_get_routes(cls):
+    osc = cls(encoding='utf8')
     osc.listen(default=True)
 
     values = []
@@ -877,18 +915,20 @@ def test_get_routes():
     assert u'/test_route' in values
 
 
-def test_get_sender():
-    osc = OSCThreadServer(encoding='utf8')
+@pytest.mark.parametrize("cls", server_classes)
+def test_get_sender(cls):
+    osc = cls(encoding='utf8')
     osc.listen(default=True)
 
-    values = []
+    event = Event()
 
     @osc.address(u'/test_route')
     def callback(*val):
-        values.append(osc.get_sender())
+        osc.get_sender()
+        event.set()
 
     with pytest.raises(RuntimeError,
-                       match='get_sender\(\) not called from a callback'):
+                       match=r'get_sender\(\) not called from a callback'):
         osc.get_sender()
 
     send_message(
@@ -907,7 +947,8 @@ def test_get_sender():
         sleep(10e-9)
 
 
-def test_server_different_port():
+@pytest.mark.parametrize("cls", server_classes)
+def test_server_different_port(cls):
     # used for storing values received by callback_3000
     checklist = []
 
@@ -915,7 +956,7 @@ def test_server_different_port():
         checklist.append(values[0])
 
     # server, will be tested:
-    server_3000 = OSCThreadServer(encoding='utf8')
+    server_3000 = cls(encoding='utf8')
     sock_3000 = server_3000.listen(address='0.0.0.0', port=3000, default=True)
     server_3000.bind(b'/callback_3000', callback_3000)
 
