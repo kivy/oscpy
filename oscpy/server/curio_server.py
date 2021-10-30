@@ -1,4 +1,5 @@
 import logging
+from typing import Awaitable
 
 from curio import TaskGroup, socket
 from oscpy.server import OSCBaseServer, UDP_MAX_SIZE
@@ -43,12 +44,14 @@ class OSCCurioServer(OSCBaseServer):
         for cb, get_address in callbacks_list:
             try:
                 if get_address:
-                    await cb(address, *values)
+                    result = cb(address, *values)
                 else:
-                    await cb(*values)
+                    result = cb(*values)
+                if isinstance(result, Awaitable):
+                    await result
             except Exception:
                 if self.intercept_errors:
-                    logger.error("Unhandled exception caught in oscpy server", exc_info=True)
+                    logger.exception("Ignoring unhandled exception caught in oscpy server")
                 else:
                     raise
 

@@ -118,7 +118,7 @@ def test_stop_all(cls):
     osc.stop_all()
 
 
-@pytest.mark.parametrize("cls", server_classes)
+@pytest.mark.parametrize("cls", {OSCThreadServer})
 def test_terminate_server(cls):
     osc = cls()
     assert not osc.join_server(timeout=0.1)
@@ -152,14 +152,13 @@ def test_intercept_errors(caplog, cls):
     osc.bind(b'/broken_callback', broken_callback, sock)
     osc.bind(b'/success', success, sock)
     send_message(b'/broken_callback', [b'test'], 'localhost', port)
-    sleep(0.01)
     send_message(b'/success', [b'test'], 'localhost', port)
     runner(osc, timeout=.2)
     assert event.is_set()
 
     assert len(caplog.records) == 1, caplog.records
     record = caplog.records[0]
-    assert record.msg == "Unhandled exception caught in oscpy server"
+    assert record.msg == "Ignoring unhandled exception caught in oscpy server"
     assert not record.args
     assert record.exc_info
 
@@ -169,7 +168,7 @@ def test_intercept_errors(caplog, cls):
     osc.bind(b'/broken_callback', broken_callback, sock)
     send_message(b'/broken_callback', [b'test'], 'localhost', port)
     runner(osc, timeout=.2)
-    assert len(caplog.records) == 1, caplog.records  # Unchanged
+    assert len(caplog.records) == 2, caplog.records  # Unchanged
 
 
 @pytest.mark.parametrize("cls", server_classes)
@@ -219,7 +218,8 @@ def test_bind_get_address(cls):
 
     send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port)
 
-    assert event.wait(5), 'timeout while waiting for success message.'
+    runner(osc)
+    assert event.wait(1), 'timeout while waiting for success message.'
 
 
 @pytest.mark.parametrize("cls", server_classes)
@@ -236,8 +236,8 @@ def test_bind_get_address_smart(cls):
     osc.bind(b'/success/?', success, sock, get_address=True)
 
     send_message(b'/success/a', [b'test', 1, 1.12345], 'localhost', port)
-
-    assert event.wait(5), 'timeout while waiting for success message.'
+    runner(osc, timeout=1, socket=sock)
+    assert event.wait(1), 'timeout while waiting for success message.'
 
 @pytest.mark.parametrize("cls", server_classes)
 def test_reuse_callback(cls):
@@ -333,6 +333,7 @@ def test_bind_address(cls):
 
     send_message(b'/test', [], *osc.getaddress())
 
+    runner(osc)
     assert event.wait(1), 'timeout while waiting for test message.'
 
 
@@ -350,10 +351,9 @@ def test_bind_address_class(cls):
         def success(self, *args):
             self.event.set()
 
-    timeout = time() + 1
-
     test = Test()
     send_message(b'/test', [], *osc.getaddress())
+    runner(osc)
     assert test.event.wait(1), 'timeout while waiting for test message.'
 
 
@@ -382,6 +382,7 @@ def test_bind_default(cls):
 
     send_message(b'/success', [b'test', 1, 1.12345], 'localhost', port)
 
+    runner(osc)
     assert event.wait(1), 'timeout while waiting for test message.'
 
 
@@ -468,6 +469,7 @@ def test_advanced_matching(cls):
     osc.listen(default=True)
     port = osc.getaddress()[1]
     result = {}
+    event = Event()
 
     def save_result(f):
         name = f.__name__
@@ -559,6 +561,10 @@ def test_advanced_matching(cls):
     def parts_somestrings3(*values):
         pass
 
+    @osc.address(b'/done')
+    def done(*values):
+        event.set()
+
     send_bundle(
         (
             (b'/a', [1]),
@@ -619,6 +625,7 @@ def test_advanced_matching(cls):
             (b'/part1/part2/string2', [48]),
             (b'/part1/part2/prefix-string1', [49]),
             (b'/part1/part2/sprefix-tring2', [50]),
+            (b'/done', []),
         ),
         'localhost', port
     )
@@ -636,12 +643,9 @@ def test_advanced_matching(cls):
         'parts_somestrings3': [(49,)]
     }
 
-    timeout = time() + 5
-    while result != expected:
-        if time() > timeout:
-            print("expected: {}\n result: {}\n".format(expected, result))
-            raise OSError('timeout while waiting for expected result.')
-        sleep(10e-9)
+    runner(osc, timeout=.1)
+    assert event.wait(1), 'timeout while waiting for test message.'
+    assert result == expected
 
 
 @pytest.mark.parametrize("cls", server_classes)
@@ -649,30 +653,27 @@ def test_decorator(cls):
     osc = cls()
     sock = osc.listen(default=True)
     port = sock.getsockname()[1]
-    cont = []
+    event1 = Event()
+    event2 = Event()
 
     @osc.address(b'/test1', sock)
     def test1(*values):
-        print("test1 called")
-        cont.append(True)
+        event1.set()
 
     @osc.address(b'/test2')
     def test2(*values):
-        print("test1 called")
-        cont.append(True)
+        event2.set()
 
     send_message(b'/test1', [], 'localhost', port)
     send_message(b'/test2', [], 'localhost', port)
 
-    timeout = time() + 1
-    while len(cont) < 2:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
+    runner(osc)
+    assert event1.wait(1) and event2.is_set(), "timeout waiting for test messages"
 
 
-@pytest.mark.parametrize("cls", server_classes)
+@pytest.mark.parametrize("cls", {OSCThreadServer})
 def test_answer(cls):
-    cont = []
+    event = Event()
 
     osc_1 = cls(intercept_errors=False)
     osc_1.listen(default=True)
@@ -701,18 +702,17 @@ def test_answer(cls):
     @osc_3.address(b'/zap')
     def zap(*values):
         if True in values:
-            cont.append(True)
+            event.set()
 
     osc_2.send_message(b'/ping', [], *osc_1.getaddress())
 
+    runner(osc_1)
+    runner(osc_2)
+    runner(osc_3)
     with pytest.raises(RuntimeError) as e_info:  # noqa
         osc_1.answer(b'/bing', [])
 
-    timeout = time() + 2
-    while not cont:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
-        sleep(10e-9)
+    assert event.wait(1), 'timeout while waiting for test message.'
 
 
 @pytest.mark.parametrize("cls", server_classes)
@@ -740,23 +740,22 @@ def test_encoding_send(cls):
     osc.listen(default=True)
 
     values = []
+    event = Event()
 
     @osc.address(b'/encoded')
     def encoded(*val):
         for v in val:
             assert isinstance(v, bytes)
         values.append(val)
+        event.set()
 
     send_message(
         u'/encoded',
         ['hello world', u'ééééé ààààà'],
         *osc.getaddress(), encoding='utf8')
 
-    timeout = time() + 2
-    while not values:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
-        sleep(10e-9)
+    runner(osc)
+    assert event.wait(1), 'timeout while waiting for test message.'
 
 
 @pytest.mark.parametrize("cls", server_classes)
@@ -765,12 +764,14 @@ def test_encoding_receive(cls):
     osc.listen(default=True)
 
     values = []
+    event = Event()
 
     @osc.address(u'/encoded')
     def encoded(*val):
         for v in val:
             assert not isinstance(v, bytes)
         values.append(val)
+        event.set()
 
     send_message(
         b'/encoded',
@@ -780,17 +781,15 @@ def test_encoding_receive(cls):
         ],
         *osc.getaddress())
 
-    timeout = time() + 2
-    while not values:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
-        sleep(10e-9)
+    runner(osc)
+    assert event.wait(1), 'timeout while waiting for test message.'
 
 
 @pytest.mark.parametrize("cls", server_classes)
 def test_encoding_send_receive(cls):
     osc = cls(encoding='utf8')
     osc.listen(default=True)
+    event = Event()
 
     values = []
 
@@ -799,25 +798,25 @@ def test_encoding_send_receive(cls):
         for v in val:
             assert not isinstance(v, bytes)
         values.append(val)
+        event.set()
 
     send_message(
         u'/encoded',
         ['hello world', u'ééééé ààààà'],
         *osc.getaddress(), encoding='utf8')
 
-    timeout = time() + 2
-    while not values:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
-        sleep(10e-9)
+    runner(osc)
+    assert event.wait(1), 'timeout while waiting for test message.'
 
 
 @pytest.mark.parametrize("cls", server_classes)
 def test_default_handler(cls):
     results = []
+    event = Event()
 
     def test(address, *values):
         results.append((address, values))
+        event.set()
 
     osc = cls(default_handler=test)
     osc.listen(default=True)
@@ -826,7 +825,7 @@ def test_default_handler(cls):
     def passthrough(*values):
         pass
 
-    osc.send_bundle(
+    send_bundle(
         (
             (b'/test', []),
             (b'/passthrough', []),
@@ -835,11 +834,8 @@ def test_default_handler(cls):
         *osc.getaddress()
     )
 
-    timeout = time() + 2
-    while len(results) < 2:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
-        sleep(10e-9)
+    runner(osc)
+    assert event.wait(2), 'timeout while waiting for test message.'
 
     expected = (
         (b'/test', tuple()),
@@ -850,7 +846,7 @@ def test_default_handler(cls):
         assert e == r
 
 
-@pytest.mark.parametrize("cls", server_classes)
+@pytest.mark.parametrize("cls", {OSCThreadServer})
 def test_get_version(cls):
     osc = cls(encoding='utf8')
     osc.listen(default=True)
@@ -859,7 +855,6 @@ def test_get_version(cls):
 
     @osc.address(u'/_oscpy/version/answer')
     def cb(val):
-        print(val)
         values.append(val)
 
     send_message(
@@ -872,20 +867,16 @@ def test_get_version(cls):
         encoding_errors='strict'
     )
 
-    timeout = time() + 2
-    while not values:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
-        sleep(10e-9)
-
+    runner(osc)
     assert __version__ in values
 
 
-@pytest.mark.parametrize("cls", server_classes)
+@pytest.mark.parametrize("cls", {OSCThreadServer})
 def test_get_routes(cls):
     osc = cls(encoding='utf8')
     osc.listen(default=True)
 
+    event = Event()
     values = []
 
     @osc.address(u'/test_route')
@@ -895,6 +886,7 @@ def test_get_routes(cls):
     @osc.address(u'/_oscpy/routes/answer')
     def cb(*routes):
         values.extend(routes)
+        event.set()
 
     send_message(
         b'/_oscpy/routes',
@@ -906,12 +898,8 @@ def test_get_routes(cls):
         encoding_errors='strict'
     )
 
-    timeout = time() + 2
-    while not values:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
-        sleep(10e-9)
-
+    runner(osc)
+    assert event.wait(1)
     assert u'/test_route' in values
 
 
@@ -919,7 +907,6 @@ def test_get_routes(cls):
 def test_get_sender(cls):
     osc = cls(encoding='utf8')
     osc.listen(default=True)
-
     event = Event()
 
     @osc.address(u'/test_route')
@@ -932,66 +919,46 @@ def test_get_sender(cls):
         osc.get_sender()
 
     send_message(
-        b'/test_route',
-        [
-            osc.getaddress()[1]
-        ],
+        u'/test_route',
+        [osc.getaddress()[1]],
         *osc.getaddress(),
         encoding='utf8'
     )
 
-    timeout = time() + 2
-    while not values:
-        if time() > timeout:
-            raise OSError('timeout while waiting for success message.')
-        sleep(10e-9)
+    runner(osc)
+    assert event.wait(2), 'timeout while waiting for test message.'
 
 
 @pytest.mark.parametrize("cls", server_classes)
 def test_server_different_port(cls):
     # used for storing values received by callback_3000
-    checklist = []
+    checklist = [Event(), Event()]
 
-    def callback_3000(*values):
-        checklist.append(values[0])
+    def callback(index):
+        checklist[index].set()
 
     # server, will be tested:
-    server_3000 = cls(encoding='utf8')
-    sock_3000 = server_3000.listen(address='0.0.0.0', port=3000, default=True)
-    server_3000.bind(b'/callback_3000', callback_3000)
+    osc = cls(encoding='utf8')
+    sock = osc.listen(address='0.0.0.0', default=True)
+    port = sock.getsockname()[1]
+    osc.bind('/callback', callback)
 
-    # clients sending to different ports, used to test the server:
-    client_3000 = OSCClient(address='localhost', port=3000, encoding='utf8')
+    # clients sending to different ports, used to test the osc:
+    client = OSCClient(address='localhost', port=port, encoding='utf8')
 
-    # server sends message to himself, should work:
-    server_3000.send_message(
-        b'/callback_3000',
-        ["a"],
-        ip_address='localhost',
-        port=3000
-    )
-    sleep(0.05)
-
-    # client sends message to server, will be received properly:
-    client_3000.send_message(b'/callback_3000', ["b"])
-    sleep(0.05)
+    # osc.send_message(b'/callback', [0], ip_address='localhost', port=port)
+    client.send_message('/callback', [0])
 
     # sever sends message on different port, might crash the server on windows:
-    server_3000.send_message(
-        b'/callback_3000',
-        ["nobody is going to receive this"],
-        ip_address='localhost',
-        port=3001
-    )
-    sleep(0.05)
+    osc.send_message('/callback', ["nobody is going to receive this"], ip_address='localhost', port=port + 1)
 
     # client sends message to server again. if server is dead, message
     # will not be received:
-    client_3000.send_message(b'/callback_3000', ["c"])
-    sleep(0.1)
+    client.send_message('/callback', [1])
 
     # if 'c' is missing in the received checklist, the server thread
     # crashed and could not recieve the last message from the client:
-    assert checklist == ['a', 'b', 'c']
+    runner(osc, timeout=0.1)
+    assert all(event.wait(1) for event in checklist)
 
-    server_3000.stop()	# clean up
+    # osc.stop()  # clean up

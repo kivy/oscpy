@@ -363,7 +363,7 @@ class OSCBaseServer(object):
         """
         frames = inspect.getouterframes(inspect.currentframe())
         for frame, filename, _, function, _, _ in frames:
-            if function == 'handle_message' and __FILE__.startswith(filename):
+            if function == 'handle_message' and frame.f_locals.get('self') is self and 'sender_socket' in frame.f_locals:
                 break
         else:
             raise RuntimeError('get_sender() not called from a callback')
@@ -522,8 +522,9 @@ class OSCBaseServer(object):
                     cb(*values)
             except Exception:
                 if self.intercept_errors:
-                    logger.exception("Unhandled exception caught in oscpy server")
+                    logger.exception("Ignoring unhandled exception caught in oscpy server")
                 else:
+                    logger.exception("Unhandled exception caught in oscpy server")
                     raise
 
     def handle_message(self, data, sender, sender_socket):

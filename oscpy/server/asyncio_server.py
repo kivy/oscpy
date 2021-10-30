@@ -2,6 +2,7 @@ import asyncio
 import socket
 from functools import partial
 from logging import getLogger
+from typing import Awaitable
 
 from oscpy.server import OSCBaseServer
 
@@ -18,11 +19,21 @@ class OSCAsyncioServer(OSCBaseServer):
     def listen(self, address='localhost', port=0, default=False, family='inet', **kwargs):
         loop = asyncio.get_event_loop()
         if family == 'unix':
+            family_ = socket.AF_UNIX
+        elif family == 'inet':
+            family_ = socket.AF_INET
+        else:
+            raise ValueError(
+                "Unknown socket family, accepted values are 'unix' and 'inet'"
+            )
+
+        if family == 'unix':
             addr = address
         else:
             addr = (address, port)
+
         sock = self.get_socket(
-            family=socket.AF_UNIX if family == 'unix' else socket.AF_INET,
+            family=family_,
             addr=addr,
         )
         self.listeners[(address, port or sock.getsockname()[1])] = loop.create_datagram_endpoint(
@@ -46,12 +57,16 @@ class OSCAsyncioServer(OSCBaseServer):
         for cb, get_address in callbacks_list:
             try:
                 if get_address:
-                    await cb(address, *values)
+                    result = cb(address, *values)
                 else:
-                    await cb(*values)
+                    result = cb(*values)
+                if isinstance(result, Awaitable):
+                    await result
+            except asyncio.CancelledError:
+                ...
             except Exception:
                 if self.intercept_errors:
-                    logger.exception("Unhandled exception caught in oscpy server")
+                    logger.exception("Ignoring unhandled exception caught in oscpy server")
                 else:
                     raise
 
