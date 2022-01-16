@@ -12,7 +12,7 @@ from oscpy.server import OSCThreadServer, ServerClass
 from oscpy.client import send_message, send_bundle, OSCClient
 from oscpy import __version__
 
-from utils import runner, _await, _callback
+from tests.utils import runner, _await, _callback
 
 if version_info > (3, 5, 0):
     from oscpy.server.curio_server import OSCCurioServer
@@ -20,12 +20,20 @@ if version_info > (3, 5, 0):
     from oscpy.server.asyncio_server import OSCAsyncioServer
     server_classes = {
         OSCThreadServer,
-        # OSCTrioServer,
+        OSCTrioServer,
         OSCAsyncioServer,
         OSCCurioServer,
     }
 else:
-    server_classes = [OSCThreadServer]
+    # so we can refer to them safely
+    OSCTrioServer = OSCAsyncioServer = OSCCurioServer = None
+    server_classes = {OSCThreadServer}
+
+
+# # force a one second interval between each test to avoid messages hitting the
+# # wrong server
+# def teardown_function(function):
+#     sleep(1)
 
 
 @pytest.mark.parametrize("cls", server_classes)
@@ -34,10 +42,11 @@ def test_instance(cls):
 
 
 @pytest.mark.parametrize("cls", server_classes)
-def test_listen(cls):
+def test_listen_simple(cls):
     osc = cls()
-    sock = osc.listen()
+    sock = _await(osc.listen, osc)
     runner(osc, timeout=1, socket=sock)
+    _await(osc.close, osc, (sock,))
 
 
 @pytest.mark.parametrize("cls", server_classes)
@@ -63,18 +72,15 @@ def test_listen_default(cls):
         # osc.listen(default=True)
         _await(osc.listen, osc, kwargs=dict(default=True))
 
-    osc.close(sock)
+    _await(osc.close, osc, (sock,))
     _await(osc.listen, osc, kwargs=dict(default=True))
 
 
 @pytest.mark.parametrize("cls", server_classes)
 def test_close(cls):
     osc = cls()
-    _await(osc.listen, osc, kwargs=dict(default=True))
-
-    osc.close()
-    with pytest.raises(RuntimeError) as e_info:  # noqa
-        osc.close()
+    sock = _await(osc.listen, osc, kwargs=dict(default=True))
+    _await(osc.close, osc, (sock,))
 
 
 @pytest.mark.skipif(platform == 'win32', reason="unix sockets not available on windows")
@@ -82,10 +88,9 @@ def test_close(cls):
 def test_close_unix(cls):
     osc = cls()
     filename = mktemp()
-    # unix = osc.listen(address=filename, family='unix')
     unix = _await(osc.listen, osc, kwargs=dict(address=filename, family='unix'))
     assert exists(filename)
-    osc.close(unix)
+    _await(osc.close, osc, (unix,))
     assert not exists(filename)
 
 
@@ -101,7 +106,7 @@ def test_stop_default(cls):
     osc = cls()
     _await(osc.listen, osc, kwargs=dict(default=True))
     assert len(osc.sockets) == 1
-    osc.stop()
+    _await(osc.stop, osc)
     assert len(osc.sockets) == 0
 
 
@@ -112,12 +117,14 @@ def test_stop_all(cls):
     host, port = sock.getsockname()
     sock2 = _await(osc.listen, osc)
     assert len(osc.sockets) == 2
-    osc.stop_all()
+    runner(osc, timeout=.2)
+    _await(osc.stop_all, osc)
     assert len(osc.sockets) == 0
     sleep(.1)
     sock3 = _await(osc.listen, osc, kwargs=dict(default=True))
     assert len(osc.sockets) == 1
-    osc.stop_all()
+    runner(osc, timeout=.2)
+    _await(osc.stop_all, osc)
 
 
 @pytest.mark.parametrize("cls", {OSCThreadServer})
@@ -149,7 +156,7 @@ def test_intercept_errors(caplog, cls):
         raise ValueError("some bad value")
 
     osc = cls()
-    sock = osc.listen()
+    sock = _await(osc.listen, osc)
     port = sock.getsockname()[1]
     osc.bind(b'/broken_callback', broken_callback, sock)
     osc.bind(b'/success', success, sock)
@@ -165,11 +172,14 @@ def test_intercept_errors(caplog, cls):
     assert record.exc_info
 
     osc = cls(intercept_errors=False)
-    sock = osc.listen()
+    sock = _await(osc.listen, osc)
     port = sock.getsockname()[1]
     osc.bind(b'/broken_callback', broken_callback, sock)
-    send_message(b'/broken_callback', [b'test'], 'localhost', port)
-    runner(osc, timeout=.2)
+    try:
+        send_message(b'/broken_callback', [b'test'], 'localhost', port)
+        runner(osc, timeout=.2)
+    except Exception:
+        pass
     assert len(caplog.records) == 2, caplog.records  # Unchanged
 
 
@@ -179,7 +189,7 @@ def test_send_bundle_without_socket(cls):
     with pytest.raises(RuntimeError):
         osc.send_bundle([], 'localhost', 0)
 
-    osc.listen(default=True)
+    sock = _await(osc.listen, osc, kwargs={'default': True})
     osc.send_bundle(
         (
             (b'/test', []),
@@ -191,7 +201,7 @@ def test_send_bundle_without_socket(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_bind1(cls):
     osc = cls()
-    sock = osc.listen(default=True)
+    sock = _await(osc.listen, osc, kwargs={'default': True})
     port = sock.getsockname()[1]
     event = Event()
 
@@ -208,7 +218,7 @@ def test_bind1(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_bind_get_address(cls):
     osc = cls()
-    sock = osc.listen(default=True)
+    sock = _await(osc.listen, osc, kwargs={'default': True})
     port = sock.getsockname()[1]
     event = Event()
 
@@ -227,7 +237,7 @@ def test_bind_get_address(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_bind_get_address_smart(cls):
     osc = cls(advanced_matching=True)
-    sock = osc.listen(default=True)
+    sock = _await(osc.listen, osc, kwargs={'default': True})
     port = sock.getsockname()[1]
     event = Event()
 
@@ -244,7 +254,7 @@ def test_bind_get_address_smart(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_reuse_callback(cls):
     osc = cls()
-    sock = osc.listen()
+    sock = _await(osc.listen, osc)
     port = sock.getsockname()[1]
 
     def success(*values):
@@ -260,7 +270,7 @@ def test_reuse_callback(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_unbind(cls):
     osc = cls()
-    sock = osc.listen()
+    sock = _await(osc.listen, osc)
     port = sock.getsockname()[1]
     event = Event()
 
@@ -280,7 +290,7 @@ def test_unbind(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_unbind_default(cls):
     osc = cls()
-    sock = osc.listen(default=True)
+    sock = _await(osc.listen, osc, kwargs={'default': True})
     port = sock.getsockname()[1]
     event = Event()
 
@@ -299,12 +309,12 @@ def test_unbind_default(cls):
 def test_bind_multi(cls):
     osc = cls()
 
-    sock1 = osc.listen()
+    sock1 = _await(osc.listen, osc)
     port1 = sock1.getsockname()[1]
     event1 = Event()
     osc.bind(b'/success', _callback(osc, lambda *_: event1.set()), sock1)
 
-    sock2 = osc.listen()
+    sock2 = _await(osc.listen, osc)
     port2 = sock2.getsockname()[1]
     event2 = Event()
     osc.bind(b'/success', _callback(osc, lambda *_: event2.set()), sock2)
@@ -323,7 +333,7 @@ def test_bind_multi(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_bind_address(cls):
     osc = cls()
-    osc.listen(default=True)
+    _await(osc.listen, osc, kwargs=dict(default=True))
     result = []
     event = Event()
 
@@ -342,7 +352,7 @@ def test_bind_address(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_bind_address_class(cls):
     osc = cls()
-    osc.listen(default=True)
+    _await(osc.listen, osc, kwargs=dict(default=True))
 
     @ServerClass
     class Test(object):
@@ -373,7 +383,7 @@ def test_bind_no_default(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_bind_default(cls):
     osc = cls()
-    osc.listen(default=True)
+    _await(osc.listen, osc, kwargs=dict(default=True))
     port = osc.getaddress()[1]
     event = Event()
 
@@ -468,7 +478,7 @@ def test_smart_address_cache(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_advanced_matching(cls):
     osc = cls(advanced_matching=True)
-    osc.listen(default=True)
+    _await(osc.listen, osc, kwargs=dict(default=True))
     port = osc.getaddress()[1]
     result = {}
     event = Event()
@@ -653,7 +663,7 @@ def test_advanced_matching(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_decorator(cls):
     osc = cls()
-    sock = osc.listen(default=True)
+    sock = _await(osc.listen, osc, kwargs=dict(default=True))
     port = sock.getsockname()[1]
     event1 = Event()
     event2 = Event()
@@ -678,7 +688,7 @@ def test_answer(cls):
     event = Event()
 
     osc_1 = cls(intercept_errors=False)
-    osc_1.listen(default=True)
+    _await(osc_1.listen, osc_1, kwargs=dict(default=True))
 
     @osc_1.address(b'/ping')
     def ping(*values):
@@ -692,14 +702,14 @@ def test_answer(cls):
             )
 
     osc_2 = OSCThreadServer(intercept_errors=False)
-    osc_2.listen(default=True)
+    _await(osc_2.listen, osc_2, kwargs=dict(default=True))
 
     @osc_2.address(b'/pong')
     def pong(*values):
         osc_2.answer(b'/ping', [True])
 
     osc_3 = OSCThreadServer(intercept_errors=False)
-    osc_3.listen(default=True)
+    _await(osc_3.listen, osc_3, kwargs=dict(default=True))
 
     @osc_3.address(b'/zap')
     def zap(*values):
@@ -720,26 +730,28 @@ def test_answer(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_socket_family(cls):
     osc = cls()
-    assert osc.listen().family == socket.AF_INET
+    sock = _await(osc.listen, osc)
+    assert sock.family == socket.AF_INET
     filename = mktemp()
     if platform != 'win32':
-        assert osc.listen(address=filename, family='unix').family == socket.AF_UNIX  # noqa
+        sock = _await(osc.listen, osc, kwargs=dict(address=filename, family='unix'))
+        assert sock.family == socket.AF_UNIX  # noqa
 
     else:
         with pytest.raises(AttributeError) as e_info:
-            osc.listen(address=filename, family='unix')
+            _await(osc.listen, osc, kwargs=dict(family='unix'))
 
     if exists(filename):
         unlink(filename)
 
     with pytest.raises(ValueError) as e_info:  # noqa
-        osc.listen(family='')
+        _await(osc.listen, osc, kwargs=dict(family=''))
 
 
 @pytest.mark.parametrize("cls", server_classes)
 def test_encoding_send(cls):
     osc = cls()
-    osc.listen(default=True)
+    _await(osc.listen, osc, kwargs=dict(default=True))
 
     values = []
     event = Event()
@@ -763,7 +775,7 @@ def test_encoding_send(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_encoding_receive(cls):
     osc = cls(encoding='utf8')
-    osc.listen(default=True)
+    _await(osc.listen, osc, kwargs=dict(default=True))
 
     values = []
     event = Event()
@@ -790,7 +802,7 @@ def test_encoding_receive(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_encoding_send_receive(cls):
     osc = cls(encoding='utf8')
-    osc.listen(default=True)
+    _await(osc.listen, osc, kwargs=dict(default=True))
     event = Event()
 
     values = []
@@ -821,7 +833,7 @@ def test_default_handler(cls):
         event.set()
 
     osc = cls(default_handler=test)
-    osc.listen(default=True)
+    _await(osc.listen, osc, kwargs=dict(default=True))
 
     @osc.address(b'/passthrough')
     def passthrough(*values):
@@ -851,7 +863,7 @@ def test_default_handler(cls):
 @pytest.mark.parametrize("cls", {OSCThreadServer})
 def test_get_version(cls):
     osc = cls(encoding='utf8')
-    osc.listen(default=True)
+    _await(osc.listen, osc, kwargs=dict(default=True))
 
     values = []
 
@@ -876,7 +888,7 @@ def test_get_version(cls):
 @pytest.mark.parametrize("cls", {OSCThreadServer})
 def test_get_routes(cls):
     osc = cls(encoding='utf8')
-    osc.listen(default=True)
+    _await(osc.listen, osc, kwargs=dict(default=True))
 
     event = Event()
     values = []
@@ -908,7 +920,7 @@ def test_get_routes(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_get_sender(cls):
     osc = cls(encoding='utf8')
-    osc.listen(default=True)
+    _await(osc.listen, osc, kwargs=dict(default=True))
     event = Event()
 
     @osc.address(u'/test_route')
@@ -941,7 +953,7 @@ def test_server_different_port(cls):
 
     # server, will be tested:
     osc = cls(encoding='utf8')
-    sock = osc.listen(address='0.0.0.0', default=True)
+    sock = _await(osc.listen, osc, kwargs=dict(address='0.0.0.0', default=True))
     port = sock.getsockname()[1]
     osc.bind('/callback', callback)
 

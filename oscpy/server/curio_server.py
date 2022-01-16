@@ -1,5 +1,7 @@
 import logging
 from typing import Awaitable
+from sys import platform
+import os
 
 from curio import TaskGroup, socket
 from oscpy.server import OSCBaseServer, UDP_MAX_SIZE
@@ -60,6 +62,24 @@ class OSCCurioServer(OSCBaseServer):
             self.tasks_group = g
             for s in self.sockets:
                 await g.spawn(self._listen, s)
+
+    async def close(self, sock=None):
+        """Close a socket opened by the server."""
+        if not sock and self.default_socket:
+            sock = self.default_socket
+        elif not sock:
+            raise RuntimeError('no default socket yet and no socket provided')
+
+        if sock not in self.sockets:
+            logger.warning("Ignoring requested to close an unknown socket %s" % sock)
+
+        if sock == self.default_socket:
+            self.default_socket = None
+
+        if platform != 'win32' and sock.family == socket.AF_UNIX:
+            os.unlink(sock.getsockname())
+        else:
+            await sock.close()
 
     async def stop_all(self):
         await self.tasks_group.cancel_remaining()

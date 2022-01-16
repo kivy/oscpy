@@ -9,6 +9,7 @@ import inspect
 from time import time
 from functools import partial
 import socket
+from select import select
 
 from oscpy import __version__
 from oscpy.parser import read_packet, UNICODE
@@ -263,13 +264,22 @@ class OSCBaseServer(object):
         elif not sock:
             raise RuntimeError('no default socket yet and no socket provided')
 
+        if sock == self.default_socket:
+            self.default_socket = None
+
+        if sock not in self.sockets:
+            return
+
+        self.sockets.remove(sock)
+        read = select([sock], [], [], 0)
         if platform != 'win32' and sock.family == socket.AF_UNIX:
+            print(sock.getsockname())
             os.unlink(sock.getsockname())
         else:
             sock.close()
 
-        if sock == self.default_socket:
-            self.default_socket = None
+        if sock in read:
+            sock.recvfrom(UDP_MAX_SIZE)
 
     def getaddress(self, sock=None):
         """Wrap call to getsockname.
