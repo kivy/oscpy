@@ -43,13 +43,13 @@ def test_listen(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_getaddress(cls):
     osc = cls()
-    sock = osc.listen()
+    sock = _await(osc.listen, osc)
     assert osc.getaddress(sock)[0] == '127.0.0.1'
 
     with pytest.raises(RuntimeError):
         osc.getaddress()
 
-    sock2 = osc.listen(default=True)
+    sock2 = _await(osc.listen, osc, kwargs=dict(default=True))
     assert osc.getaddress(sock2)[0] == '127.0.0.1'
     runner(osc, timeout=1, socket=sock)
 
@@ -57,19 +57,20 @@ def test_getaddress(cls):
 @pytest.mark.parametrize("cls", server_classes)
 def test_listen_default(cls):
     osc = cls()
-    sock = osc.listen(default=True)
+    sock = _await(osc.listen, osc, kwargs=dict(default=True))
 
     with pytest.raises(RuntimeError) as e_info:  # noqa
-        osc.listen(default=True)
+        # osc.listen(default=True)
+        _await(osc.listen, osc, kwargs=dict(default=True))
 
     osc.close(sock)
-    osc.listen(default=True)
+    _await(osc.listen, osc, kwargs=dict(default=True))
 
 
 @pytest.mark.parametrize("cls", server_classes)
 def test_close(cls):
     osc = cls()
-    osc.listen(default=True)
+    _await(osc.listen, osc, kwargs=dict(default=True))
 
     osc.close()
     with pytest.raises(RuntimeError) as e_info:  # noqa
@@ -81,7 +82,8 @@ def test_close(cls):
 def test_close_unix(cls):
     osc = cls()
     filename = mktemp()
-    unix = osc.listen(address=filename, family='unix')
+    # unix = osc.listen(address=filename, family='unix')
+    unix = _await(osc.listen, osc, kwargs=dict(address=filename, family='unix'))
     assert exists(filename)
     osc.close(unix)
     assert not exists(filename)
@@ -97,7 +99,7 @@ def test_stop_unknown(cls):
 @pytest.mark.parametrize("cls", server_classes - {OSCCurioServer})
 def test_stop_default(cls):
     osc = cls()
-    osc.listen(default=True)
+    _await(osc.listen, osc, kwargs=dict(default=True))
     assert len(osc.sockets) == 1
     osc.stop()
     assert len(osc.sockets) == 0
@@ -106,14 +108,14 @@ def test_stop_default(cls):
 @pytest.mark.parametrize("cls", server_classes - {OSCCurioServer})
 def test_stop_all(cls):
     osc = cls()
-    sock = osc.listen(default=True)
+    sock = _await(osc.listen, osc, kwargs=dict(default=True))
     host, port = sock.getsockname()
-    osc.listen()
+    sock2 = _await(osc.listen, osc)
     assert len(osc.sockets) == 2
     osc.stop_all()
     assert len(osc.sockets) == 0
     sleep(.1)
-    osc.listen(address=host, port=port)
+    sock3 = _await(osc.listen, osc, kwargs=dict(default=True))
     assert len(osc.sockets) == 1
     osc.stop_all()
 

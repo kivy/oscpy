@@ -42,6 +42,8 @@ class OSCThreadServer(OSCBaseServer):
             if s in read:
                 s.recvfrom(UDP_MAX_SIZE)
             self.sockets.remove(s)
+            if s is self.default_socket:
+                self.default_socket = None
         else:
             raise RuntimeError('{} is not one of my sockets!'.format(s))
 

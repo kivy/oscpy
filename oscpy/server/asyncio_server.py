@@ -55,6 +55,7 @@ class OSCAsyncioServer(OSCBaseServer):
 
     async def _execute_callbacks(self, callbacks_list, address, values):
         for cb, get_address in callbacks_list:
+            result = None
             try:
                 if get_address:
                     result = cb(address, *values)
@@ -69,6 +70,9 @@ class OSCAsyncioServer(OSCBaseServer):
                     logger.exception("Ignoring unhandled exception caught in oscpy server")
                 else:
                     raise
+            finally:
+                if result:
+                    del result
 
     def stop(self, sock=None):
         """Close and remove a socket from the server's sockets.
@@ -82,6 +86,8 @@ class OSCAsyncioServer(OSCBaseServer):
         if sock in self.sockets:
             sock.close()
             self.sockets.remove(sock)
+            if sock is self.default_socket:
+                self.default_socket = None
         else:
             raise RuntimeError('{} is not one of my sockets!'.format(sock))
 

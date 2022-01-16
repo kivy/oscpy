@@ -24,6 +24,11 @@ async def osc_app(address, port):
         print(f"time to leave!")
         await osc.stop_all()
 
+    @osc.address("/info")
+    async def info():
+        address, port = osc.getaddress()
+        print(address, port)
+
     await osc.process()
 
 trio.run(osc_app, '0.0.0.0', 8000)

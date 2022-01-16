@@ -84,7 +84,7 @@ class OSCTrioServer(OSCBaseServer):
         nursery = self.nurseries.pop(sock)
         nursery.cancel_scope.deadline = 0
 
-    async def getaddress(self, sock=None):
+    def getaddress(self, sock=None):
         """Wrap call to getsockname.
 
         If `sock` is None, uses the default socket for the server.
@@ -97,4 +97,4 @@ class OSCTrioServer(OSCBaseServer):
         elif not sock:
             raise RuntimeError('no default socket yet and no socket provided')
 
-        return await sock.getsockname()
+        return sock.getsockname()
