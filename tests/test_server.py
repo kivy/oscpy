@@ -912,7 +912,7 @@ def test_get_sender():
         values.append(osc.get_sender())
 
     with pytest.raises(RuntimeError,
-                       match='get_sender\(\) not called from a callback'):
+                       match=r'get_sender\(\) not called from a callback'):
         osc.get_sender()
 
     send_message(
