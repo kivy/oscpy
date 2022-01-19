@@ -975,8 +975,8 @@ def test_server_different_port():
     server_3000.stop()	# clean up
 
 
-def test_accept_malformed_messages():
-    osc = OSCThreadServer(accept_malformed_messages=True)
+def test_validate_message_address_disabled():
+    osc = OSCThreadServer(validate_message_address=False)
     osc.listen(default=True)
 
     received = []
