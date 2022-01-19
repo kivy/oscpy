@@ -105,6 +105,7 @@ def test_send_message_without_socket():
         osc.send_message(b'/test', [], 'localhost', 0)
 
 
+@pytest.mark.filterwarnings(pytest.PytestUnhandledThreadExceptionWarning)
 def test_intercept_errors(caplog):
 
     cont = []
