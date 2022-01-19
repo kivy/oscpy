@@ -60,7 +60,8 @@ class OSCThreadServer(object):
 
     def __init__(
         self, drop_late_bundles=False, timeout=0.01, advanced_matching=False,
-        encoding='', encoding_errors='strict', default_handler=None, intercept_errors=True
+        encoding='', encoding_errors='strict', default_handler=None, intercept_errors=True,
+        validate_message_address=True
     ):
         """Create an OSCThreadServer.
 
@@ -86,6 +87,10 @@ class OSCThreadServer(object):
         - `intercept_errors`, if True, means that exception raised by
           callbacks will be intercepted and logged. If False, the handler
           thread will terminate mostly silently on such exceptions.
+        - `validate_message_address`, if True, require received messages
+          to have an address beginning with the specified OSC address
+          pattern of '/'. Set to False to accept messages from
+          implementations that ignore the address pattern specification.
         """
         self._must_loop = True
         self._termination_event = Event()
@@ -100,6 +105,7 @@ class OSCThreadServer(object):
         self.encoding_errors = encoding_errors
         self.default_handler = default_handler
         self.intercept_errors = intercept_errors
+        self.validate_message_address = validate_message_address
 
         self.stats_received = Stats()
         self.stats_sent = Stats()
@@ -386,7 +392,8 @@ class OSCThreadServer(object):
                 try:
                     for address, tags, values, offset in read_packet(
                         data, drop_late=drop_late, encoding=self.encoding,
-                        encoding_errors=self.encoding_errors
+                        encoding_errors=self.encoding_errors,
+                        validate_message_address=self.validate_message_address
                     ):
                         stats.calls += 1
                         stats.bytes += offset

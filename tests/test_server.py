@@ -973,3 +973,25 @@ def test_server_different_port():
     assert checklist == ['a', 'b', 'c']
 
     server_3000.stop()	# clean up
+
+
+def test_accept_malformed_messages():
+    osc = OSCThreadServer(accept_malformed_messages=True)
+    osc.listen(default=True)
+
+    received = []
+
+    @osc.address(b'malformed')
+    def malformed(*val):
+        received.append(val[0])
+
+    send_message(
+        b'malformed',
+        [ b'message' ],
+        *osc.getaddress())
+
+    timeout = time() + 2
+    while not received:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)

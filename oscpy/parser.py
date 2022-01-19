@@ -286,7 +286,7 @@ def format_message(address, values, encoding='', encoding_errors='strict'):
     return message, Stats(1, len(message), lv, count)
 
 
-def read_message(data, offset=0, encoding='', encoding_errors='strict'):
+def read_message(data, offset=0, encoding='', encoding_errors='strict', validate_message_address=True):
     """Return address, tags, values, and length of a decoded message.
 
     Can be called either on a standalone message, or on a message
@@ -294,7 +294,7 @@ def read_message(data, offset=0, encoding='', encoding_errors='strict'):
     """
     address, size = parse_string(data, offset=offset)
     index = size
-    if not address.startswith(b'/'):
+    if not address.startswith(b'/') and validate_message_address:
         raise ValueError("address {} doesn't start with a '/'".format(address))
 
     tags, size = parse_string(data, offset=offset + index)
@@ -396,7 +396,7 @@ def read_bundle(data, encoding='', encoding_errors='strict'):
     return (timetag, messages)
 
 
-def read_packet(data, drop_late=False, encoding='', encoding_errors='strict'):
+def read_packet(data, drop_late=False, encoding='', encoding_errors='strict', validate_message_address=True):
     """Detect if the data received is a simple message or a bundle, read it.
 
     Always return a list of messages.
@@ -404,15 +404,8 @@ def read_packet(data, drop_late=False, encoding='', encoding_errors='strict'):
     then returns an empty list.
     """
     header = unpack_from('>c', data, 0)[0]
-    if header == b'/':
-        return [
-            read_message(
-                data, encoding=encoding,
-                encoding_errors=encoding_errors
-            )
-        ]
 
-    elif header == b'#':
+    if header == b'#':
         timetag, messages = read_bundle(
             data, encoding=encoding, encoding_errors=encoding_errors
         )
@@ -420,5 +413,15 @@ def read_packet(data, drop_late=False, encoding='', encoding_errors='strict'):
             if time() > timetag:
                 return []
         return messages
+
+    elif header == b'/' or not validate_message_address:
+        return [
+            read_message(
+                data, encoding=encoding,
+                encoding_errors=encoding_errors,
+                validate_message_address=validate_message_address
+            )
+        ]
+
     else:
         raise ValueError('packet is not a message or a bundle')
