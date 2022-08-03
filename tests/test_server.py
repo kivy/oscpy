@@ -105,6 +105,7 @@ def test_send_message_without_socket():
         osc.send_message(b'/test', [], 'localhost', 0)
 
 
+@pytest.mark.filterwarnings(pytest.PytestUnhandledThreadExceptionWarning)
 def test_intercept_errors(caplog):
 
     cont = []
@@ -123,8 +124,12 @@ def test_intercept_errors(caplog):
     send_message(b'/broken_callback', [b'test'], 'localhost', port)
     sleep(0.01)
     send_message(b'/success', [b'test'], 'localhost', port)
-    assert not osc.join_server(timeout=0.02)  # Thread not stopped
-    assert cont == [True]
+    assert not osc.join_server(timeout=2)  # Thread not stopped
+    timeout = time() + 2
+    while not cont:
+        if time() > timeout:
+            raise OSError('timeout while waiting for success message.')
+        sleep(10e-9)
 
     assert len(caplog.records) == 1, caplog.records
     record = caplog.records[0]
@@ -137,7 +142,7 @@ def test_intercept_errors(caplog):
     port = sock.getsockname()[1]
     osc.bind(b'/broken_callback', broken_callback, sock)
     send_message(b'/broken_callback', [b'test'], 'localhost', port)
-    assert osc.join_server(timeout=0.02)  # Thread properly sets termination event on crash
+    assert osc.join_server(timeout=2) # Thread properly sets termination event on crash
 
     assert len(caplog.records) == 1, caplog.records  # Unchanged
 
@@ -907,7 +912,7 @@ def test_get_sender():
         values.append(osc.get_sender())
 
     with pytest.raises(RuntimeError,
-                       match='get_sender\(\) not called from a callback'):
+                       match=r'get_sender\(\) not called from a callback'):
         osc.get_sender()
 
     send_message(
