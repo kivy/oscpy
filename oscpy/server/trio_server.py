@@ -6,6 +6,7 @@ from typing import Awaitable
 
 from trio import socket, open_nursery, move_on_after
 from oscpy.server import OSCBaseServer, UDP_MAX_SIZE
+from oscpy.client import async_send_bundle, async_send_message
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -23,6 +24,52 @@ class OSCTrioServer(OSCBaseServer):
         sock = socket.socket(family, socket.SOCK_DGRAM)
         await sock.bind(addr)
         return sock
+
+    async def send_message(self,
+        osc_address, values, ip_address, port, sock=None, safer=False,
+        encoding='', encoding_errors='strict'
+    ):
+        if not sock and self.default_socket:
+            sock = self.default_socket
+        elif not sock:
+            raise RuntimeError('no default socket yet and no socket provided')
+        stats = await async_send_message(
+            osc_address,
+            values,
+            ip_address,
+            port,
+            sock=sock,
+            safer=safer,
+            encoding=self.encoding,
+            encoding_errors=self.encoding_errors
+        )
+        self.stats_sent += stats
+        return stats
+
+    async def send_bundle(
+        self, messages, ip_address, port, timetag=None, sock=None, safer=False
+    ):
+        """Shortcut to the client's `send_bundle` method.
+
+        Use the `default_socket` of the server by default.
+        See `client.send_bundle` for more info about the parameters.
+        """
+        if not sock and self.default_socket:
+            sock = self.default_socket
+        elif not sock:
+            raise RuntimeError('no default socket yet and no socket provided')
+
+        stats = await async_send_bundle(
+            messages,
+            ip_address,
+            port,
+            sock=sock,
+            safer=safer,
+            encoding=self.encoding,
+            encoding_errors=self.encoding_errors
+        )
+        self.stats_sent += stats
+        return stats
 
     async def listen(
         self, address='localhost', port=0, default=False, family='inet'

@@ -136,12 +136,31 @@ def test_terminate_server(cls):
     assert osc.join_server(timeout=0.1)
     assert not osc._thread.is_alive()
 
+@pytest.mark.parametrize("cls", server_classes)
+def test_send_message_using_default_socket(cls):
+
+    event = Event()
+
+    def success(*values):
+        event.set()
+
+    osc = cls()
+    sock = _await(osc.listen, osc)
+    address = sock.getsockname()[0]
+    port = sock.getsockname()[1]
+    osc.bind(b'/success', success, sock)
+
+    _await(osc.listen, osc, kwargs=dict(default=True))
+    _await(osc.send_message, osc, args=[b'/success', [], address, port])
+
+    runner(osc, timeout=.2)
+    assert event.is_set()
 
 @pytest.mark.parametrize("cls", server_classes)
 def test_send_message_without_socket(cls):
     osc = cls()
     with pytest.raises(RuntimeError):
-        osc.send_message(b'/test', [], 'localhost', 0)
+        _await(osc.send_message, osc, args=[b'/test', [], 'localhost', 0])
 
 
 @pytest.mark.parametrize("cls", server_classes)
@@ -187,15 +206,16 @@ def test_intercept_errors(caplog, cls):
 def test_send_bundle_without_socket(cls):
     osc = cls()
     with pytest.raises(RuntimeError):
-        osc.send_bundle([], 'localhost', 0)
+        _await(osc.send_bundle, osc, args=[[], 'localhost', 0])
 
     sock = _await(osc.listen, osc, kwargs={'default': True})
-    osc.send_bundle(
-        (
-            (b'/test', []),
-        ),
-        'localhost', 1
-    )
+    _await(osc.send_bundle, osc,
+            args=[(
+                    (b'/test', []),
+                   ),
+                   'localhost', 1
+                  ]
+           )
 
 
 @pytest.mark.parametrize("cls", server_classes)
@@ -964,7 +984,10 @@ def test_server_different_port(cls):
     client.send_message('/callback', [0])
 
     # sever sends message on different port, might crash the server on windows:
-    osc.send_message('/callback', ["nobody is going to receive this"], ip_address='localhost', port=port + 1)
+    _await(osc.send_message, osc,
+           args=['/callback', ["nobody is going to receive this"]],
+           kwargs=dict(ip_address='localhost', port=port + 1)
+           )
 
     # client sends message to server again. if server is dead, message
     # will not be received:

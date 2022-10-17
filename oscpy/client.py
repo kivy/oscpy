@@ -150,3 +150,52 @@ class OSCClient(object):
         )
         self.stats += stats
         return stats
+
+
+# async versions for curio and trio implemenations
+# sock.sendto on an awaited server socket needs to be awaited as well
+
+async def async_send_message(
+    osc_address, values, ip_address, port, sock=SOCK, safer=False,
+    encoding='', encoding_errors='strict'
+):
+    """Send an osc message to a socket address async version.
+
+    See `send_message` for usage information
+    """
+    if platform != 'win32' and sock.family == socket.AF_UNIX:
+        address = ip_address
+    else:
+        address = (ip_address, port)
+
+    message, stats = format_message(
+        osc_address, values, encoding=encoding,
+        encoding_errors=encoding_errors
+    )
+
+    await sock.sendto(message, address)
+    if safer:
+        sleep(10e-9)
+
+    return stats
+
+
+async def async_send_bundle(
+    messages, ip_address, port, timetag=None, sock=None, safer=False,
+    encoding='', encoding_errors='strict'
+):
+    """Send a bundle built from the `messages` iterable.
+
+    See `send_bundle` for usage information.
+    """
+    if not sock:
+        sock = SOCK
+    bundle, stats = format_bundle(
+        messages, timetag=timetag, encoding=encoding,
+        encoding_errors=encoding_errors
+    )
+    await sock.sendto(bundle, (ip_address, port))
+    if safer:
+        sleep(10e-9)
+
+    return stats
