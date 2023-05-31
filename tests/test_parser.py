@@ -108,10 +108,10 @@ def test_parse_string_encoded():
 
 def test_parse_blob():
     length = 10
-    data = tuple(range(length))
-    pad = padded(length, 8)
-    fmt = '>i%iQ' % pad
-    s = struct.pack(fmt, length, *(data + (pad - length) * (0, )))
+    data = bytes(range(length))
+    pad = padded(length)
+    fmt = '>i%is' % pad
+    s = struct.pack(fmt, length, data + bytes(pad - length))
     result = parse(b'b', s)[0]
     assert result == data
 
