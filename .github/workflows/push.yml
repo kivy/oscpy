@@ -5,7 +5,7 @@ jobs:
     name: base
     strategy:
       matrix:
-        python: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python: ['3.8', '3.9', '3.10', '3.11', '3.12', 'pypy3.9', 'pypy3.10']
         # os: ['ubuntu-latest', 'windows-latest', 'macOs-latest']
         os: ['ubuntu-latest', 'windows-latest']
 
@@ -17,42 +17,6 @@ jobs:
       with:
         python-version: ${{ matrix.python }}
         allow-prereleases: true
-    - name: prepare
-      run: pip install -U setuptools wheel
-    - name: install
-      run: pip install .[dev,ci]
-    - name: test
-      run: python -m pytest --reruns 5 tests/ --cov oscpy/ --cov-branch
-    - name: coveralls
-      run: python -m coveralls
-      env:
-        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-
-  TestsPyPy:
-    name: test pypy
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@master
-    - name: Setup python
-      uses: actions/setup-python@v4
-      with:
-        python-version: pypy3
-    - name: prepare
-      run: pip install -U setuptools wheel
-    - name: install
-      run: pip install .[dev,ci]
-    - name: test
-      run: python -m pytest --reruns 5 tests/ --cov oscpy/ --cov-branch
-    - name: coveralls
-      run: python -m coveralls
-      env:
-        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-
-  TestsMacOs:
-    name: test OSX
-    runs-on: macOs-latest
-    steps:
-    - uses: actions/checkout@master
     - name: prepare
       run: pip install -U setuptools wheel
     - name: install
