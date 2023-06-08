@@ -91,10 +91,10 @@ def parse_string(value, offset=0, encoding='', encoding_errors='strict'):
 
 def parse_blob(value, offset=0, **kwargs):
     """Return a blob from offset in value."""
-    size = calcsize('>i')
-    length = unpack_from('>i', value, offset)[0]
-    data = unpack_from('>%iQ' % length, value, offset + size)
-    return data, padded(length, 8)
+    size = INT.size
+    length = INT.unpack_from(value, offset)[0]
+    data = unpack_from('>%is' % length, value, offset + size)[0]
+    return data, padded(length)
 
 
 def parse_midi(value, offset=0, **kwargs):
