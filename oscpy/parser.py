@@ -107,6 +107,12 @@ def parse_midi(value, offset=0, **kwargs):
     return midi, len(midi)
 
 
+def parse_timeage(value, offset=0, **kwargs):
+    """Return the 64bit OSC value as sec/nsec"""
+    sec = unpack_from('>Q', value, offset)[0]
+    return sec, 8
+
+
 def format_midi(value):
     return sum((val & 0xFF) << 8 * (3 - pos) for pos, val in enumerate(value))
 
@@ -154,6 +160,7 @@ PARSERS = {
     b'F': parse_false,
     b'N': parse_nil,
     b'I': parse_infinitum,
+    b't': parse_timeage,
     # TODO
     # b'h': parse_long,
     # b't': parse_timetage,
