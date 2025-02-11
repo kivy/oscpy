@@ -1,3 +1,11 @@
+v0.6.1
+======
+
+Fix header mismatch that cause the listener thread to terminate
+Add a flag to disable message address validation
+Fix binary parser to handle correctly handle blob parsing
+Add support for t typehint of TUIO 2.0 protocol, used by displax tag
+
 v0.6.0
 ======
 
