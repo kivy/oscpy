@@ -1,39 +1,50 @@
 ### OSCPy
 
+OSCPy is a Python implementation of Open Sound Control (OSC) network protocol.
+
+OSCPy is managed by the [Kivy Team](https://kivy.org/about.html).
+
+[![Backers on Open Collective](https://opencollective.com/kivy/backers/badge.svg)](https://opencollective.com/kivy)
+[![Sponsors on Open Collective](https://opencollective.com/kivy/sponsors/badge.svg)](https://opencollective.com/kivy)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
+
+![PyPI - Version](https://img.shields.io/pypi/v/oscpy)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/oscpy)
+
+[![PR Tests](https://github.com/kivy/oscpy/actions/workflows/push.yml/badge.svg)](https://github.com/kivy/oscpy/actions/workflows/push.yml)
 [![Coverage Status](https://coveralls.io/repos/github/kivy/oscpy/badge.svg?branch=master)](https://coveralls.io/github/kivy/oscpy?branch=master)
-CI is done by Github Checks, see the current commit for build status.
 
+#### What is OSC?
 
-A modern implementation of OSC for python2/3.
+[Open Sound Control](http://opensoundcontrol.org/) (OSC) is a 
+[UDP](https://en.wikipedia.org/wiki/User_Datagram_Protocol)-based network
+protocol that was designed for fast dispatching of time-sensitive messages.
 
-#### What is OSC.
+As the name suggests, it was designed as a replacement for
+[MIDI](https://en.wikipedia.org/wiki/MIDI), but applies well to other 
+situations. The protocol is simple to use. OSC addresses look like HTTP URLs.
+It accepts various basic types, such as string, float and int. 
 
-OpenSoundControl is an UDP based network protocol, that is designed for fast
-dispatching of time-sensitive messages, as the name suggests, it was designed
-as a replacement for MIDI, but applies well to other situations. The protocol is
-simple to use, OSC addresses look like http URLs, and accept various basic
-types, such as string, float, int, etc. You can think of it basically as an
-http POST, with less overhead.
+You can think of it basically as an
+[HTTP POST](https://en.wikipedia.org/wiki/POST_(HTTP)), with less overhead.
 
-You can learn more about OSC on [OpenSoundControl.org](http://opensoundcontrol.org/)
+#### OSCPy Design Goals
 
-#### Goals
-
-- python2.7/3.6+ compatibility (can be relaxed more on the python3 side
-  if needed, but nothing before 2.7 will be supported)
+- modern, pure Python implementation
 - fast
-- easy to use
+- easy-to-use
 - robust (returns meaningful errors in case of malformed messages,
   always do the right thing on correct messages, and by default intercept+log 
   the exceptions raised by callbacks)
 - separation of concerns (message parsing vs communication)
-- sync and async compatibility (threads, asyncio, trio…)
-- clean and easy to read code
+- sync and async compatibility (threads, `asyncio`, `trio`)
+- clean and easy-to-read code
 
 #### Features
 
 - serialize and parse OSC data types/Messages/Bundles
-- a thread based udp server to open sockets (INET or UNIX) and bind callbacks on osc addresses on them
+- a thread-based UDP server to open sockets (INET or UNIX)
+- bind callbacks on OSC addresses
 - a simple client
 
 #### Install
@@ -152,10 +163,9 @@ for i in range(10):
 #### Unicode
 
 By default, the server and client take bytes (encoded strings), not unicode
-strings, for osc addresses as well as osc strings. However, you can pass an
+strings, for OSC addresses as well as OSC strings. However, you can pass an
 `encoding` parameter to have your strings automatically encoded and decoded by
-them, so your callbacks will get unicode strings (unicode in python2, str in
-python3).
+them, so your callbacks will get unicode strings.
 
 ```python
 osc = OSCThreadServer(encoding='utf8')
@@ -179,7 +189,7 @@ send_message(
 
 #### CLI
 
-OSCPy provides an "oscli" util, to help with debugging:
+OSCPy provides an "oscli" utility to help with debugging:
 - `oscli dump` to listen for messages and dump them
 - `oscli send` to send messages or bundles to a server
 
@@ -188,7 +198,7 @@ See `oscli -h` for more information.
 #### GOTCHAS
 
 - `None` values are not allowed in serialization
-- Unix-type sockets must not already exist when you listen() on them
+- Unix-type sockets must not already exist when you `listen()` on them
 
 #### TODO
 
@@ -198,11 +208,75 @@ See `oscli -h` for more information.
 - an asyncio-oriented server implementation
 - examples & documentation
 
-#### Contributing
+## License
 
-Check out our [contribution guide](CONTRIBUTING.md) and feel free to improve OSCPy.
+OSCPy is [MIT licensed](LICENSE), actively developed by a great
+community and is supported by many projects managed by the 
+[Kivy Organization](https://www.kivy.org/about.html).
 
-#### License
+## Support
 
-OSCPy is released under the terms of the MIT License.
-Please see the [LICENSE.txt](LICENSE.txt) file.
+Are you having trouble using OSCPy or any of its related projects
+in the Kivy ecosystem?
+Is there an error you don’t understand? Are you trying to figure out how to use 
+it? We have volunteers who can help!
+
+The best channels to contact us for support are listed in the latest 
+[Contact Us](https://github.com/kivy/oscpy/blob/master/CONTACT.md)
+document.
+
+## Code of Conduct
+
+In the interest of fostering an open and welcoming community, we as 
+contributors and maintainers need to ensure participation in our project and 
+our sister projects is a harassment-free and positive experience for everyone. 
+It is vital that all interaction is conducted in a manner conveying respect, 
+open-mindedness and gratitude.
+
+Please consult the [latest Code of Conduct](https://github.com/kivy/oscpy/blob/master/CODE_OF_CONDUCT.md).
+
+## Contributors
+
+This project exists thanks to 
+[all the people who contribute](https://github.com/kivy/oscpy/graphs/contributors).
+[[Become a contributor](CONTRIBUTING.md)].
+
+<img src="https://contrib.nn.ci/api?repo=kivy/oscpy&pages=5&no_bot=true&radius=22&cols=18">
+
+## Backers
+
+Thank you to [all of our backers](https://opencollective.com/kivy)! 
+🙏 [[Become a backer](https://opencollective.com/kivy#backer)]
+
+<img src="https://opencollective.com/kivy/backers.svg?width=890&avatarHeight=44&button=false">
+
+## Sponsors
+
+Special thanks to 
+[all of our sponsors, past and present](https://opencollective.com/kivy).
+Support this project by 
+[[becoming a sponsor](https://opencollective.com/kivy#sponsor)].
+
+Here are our top current sponsors. Please click through to see their websites,
+and support them as they support us. 
+
+<!--- See https://github.com/orgs/kivy/discussions/15 for explanation of this code. -->
+<a href="https://opencollective.com/kivy/sponsor/0/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/0/avatar.svg"></a>
+<a href="https://opencollective.com/kivy/sponsor/1/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/1/avatar.svg"></a>
+<a href="https://opencollective.com/kivy/sponsor/2/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/2/avatar.svg"></a>
+<a href="https://opencollective.com/kivy/sponsor/3/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/3/avatar.svg"></a>
+
+<a href="https://opencollective.com/kivy/sponsor/4/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/4/avatar.svg"></a>
+<a href="https://opencollective.com/kivy/sponsor/5/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/5/avatar.svg"></a>
+<a href="https://opencollective.com/kivy/sponsor/6/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/6/avatar.svg"></a>
+<a href="https://opencollective.com/kivy/sponsor/7/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/7/avatar.svg"></a>
+
+<a href="https://opencollective.com/kivy/sponsor/8/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/8/avatar.svg"></a>
+<a href="https://opencollective.com/kivy/sponsor/9/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/9/avatar.svg"></a>
+<a href="https://opencollective.com/kivy/sponsor/10/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/10/avatar.svg"></a>
+<a href="https://opencollective.com/kivy/sponsor/11/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/11/avatar.svg"></a>
+
+<a href="https://opencollective.com/kivy/sponsor/12/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/12/avatar.svg"></a>
+<a href="https://opencollective.com/kivy/sponsor/13/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/13/avatar.svg"></a>
+<a href="https://opencollective.com/kivy/sponsor/14/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/14/avatar.svg"></a>
+<a href="https://opencollective.com/kivy/sponsor/15/website" target="_blank"><img src="https://opencollective.com/kivy/sponsor/15/avatar.svg"></a>

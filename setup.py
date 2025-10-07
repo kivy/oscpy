@@ -18,7 +18,9 @@ setup(
     name='oscpy',
     # https://packaging.python.org/en/latest/single_source_version.html
     version=__version__,
-    description='A modern and efficient OSC Client/Server implementation',
+    description=(
+        'A Python implementation of Open Sound Control (OSC) network protocol'
+    ),
     long_description=long_description,
     long_description_content_type='text/markdown',
     url=URL,
@@ -31,20 +33,19 @@ setup(
         'Topic :: Software Development :: Libraries',
         'Topic :: System :: Networking',
         'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
     ],
     keywords='OSC network udp',
 
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
     install_requires=[],
     extras_require={
-        'dev': ['pytest>=3.6', 'wheel', 'pytest-cov', 'pycodestyle'],
+        'dev': ['pytest>=3.8', 'wheel', 'pytest-cov', 'pycodestyle'],
         'ci': ['coveralls', 'pytest-rerunfailures'],
     },
     package_data={},
